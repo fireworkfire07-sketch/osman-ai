@@ -1,1 +1,0 @@
-# orhan-photo-studio-ai
