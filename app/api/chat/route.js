@@ -1,12 +1,22 @@
 import { SYSTEM_PROMPT } from "../../lib/core";
 import { buildDynamicContext } from "../../lib/context";
 import { checkRateLimit, getClientIp } from "./rateLimit";
+import { isRepositoryRequest, buildRepositoryEvidence } from "../../lib/tools/toolRouter";
+import { extractClaimedPaths, validateClaimedPaths, validateLineRanges } from "../../lib/grounding/validateClaims";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
+const REPOSITORY_ACCESS_FAILED_MESSAGE =
+  "Repository'ye erişemedim. Bu nedenle herhangi bir dosya, fonksiyon veya satır iddiasında bulunamam.";
+const REPOSITORY_UNVERIFIED_CLAIM_MESSAGE = "Bu teknik iddiayı repository kanıtıyla doğrulayamadım.";
+const ALLOWED_REPO_LABEL = "fireworkfire07-sketch/osman-ai";
+
 export async function GET() {
-  return Response.json({ groqKeyPresent: Boolean(process.env.GROQ_API_KEY) });
+  return Response.json({
+    groqKeyPresent: Boolean(process.env.GROQ_API_KEY),
+    githubTokenPresent: Boolean(process.env.GITHUB_TOKEN),
+  });
 }
 
 function streamGroqTokens(groqRes) {
@@ -51,6 +61,18 @@ function streamGroqTokens(groqRes) {
   });
 }
 
+async function readStreamToString(stream) {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    text += decoder.decode(value, { stream: true });
+  }
+  return text;
+}
+
 export async function POST(request) {
   // Oran sınırlaması, GROQ anahtarının varlığından bile önce kontrol edilir:
   // amaç yalnızca gerçek GROQ isteklerini değil, bu endpoint'e yapılan her
@@ -83,10 +105,41 @@ export async function POST(request) {
 
   const history = Array.isArray(body?.messages) ? body.messages : [];
   const dynamicContext = buildDynamicContext(body?.context || {});
+  const lastUserMessage = [...history].reverse().find((m) => m.role === "user")?.content || "";
 
-  const systemContent = dynamicContext
-    ? `${SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}`
-    : SYSTEM_PROMPT;
+  // Repository ile ilgili bir istek mi? Öyleyse gerçek GitHub API kanıtı
+  // (repo allowlist: yalnızca fireworkfire07-sketch/osman-ai) toplanır ve
+  // modele KESİN kurallarla birlikte verilir; kanıt yoksa model hiçbir
+  // dosya/satır iddiasında bulunamayacağını açıkça bilir (bkz. aşağıdaki
+  // server-side doğrulama — halüsinasyon kilidi).
+  const repoRequested = isRepositoryRequest(lastUserMessage);
+  let repoEvidence = null;
+  let repoAccessFailed = false;
+
+  if (repoRequested) {
+    if (!process.env.GITHUB_TOKEN) {
+      repoAccessFailed = true;
+    } else {
+      try {
+        repoEvidence = await buildRepositoryEvidence(lastUserMessage);
+      } catch (err) {
+        console.error("GITHUB_REPO_ACCESS_FAILED", err?.message);
+        repoAccessFailed = true;
+      }
+    }
+  }
+
+  let repositoryBlock = "";
+  if (repoRequested) {
+    repositoryBlock = repoAccessFailed
+      ? `\n\n---\nREPOSITORY ARACI ÇALIŞTIRILAMADI: Repository'ye erişemedim. Bu nedenle hiçbir dosya adı, satır numarası, fonksiyon veya teknik borç/güvenlik açığı uydurma; yalnızca "Repository'ye erişemedim" de.`
+      : `\n\n---\nREPOSITORY KANITI (gerçek GitHub API sonucu, ${ALLOWED_REPO_LABEL}, commit ${repoEvidence.commitShortSha || "bilinmiyor"}):\n${repoEvidence.evidenceText || "(ilgili dosya bulunamadı)"}\n\nKESİN KURALLAR:\n- Yalnızca yukarıdaki [SOURCE n] bloklarında verilen dosya yolunu ve satırları kullan.\n- Yukarıda verilmeyen hiçbir dosya adını, satır numarasını veya fonksiyonu söyleme.\n- Dosyanın yaşını veya geçmişini commit verisi olmadan tahmin etme.\n- "Kodda gördüm", "dosyaları inceledim" veya "kanıtladım" ifadelerini yalnızca yukarıdaki gerçek kanıt varsa kullan.\n- Her teknik iddiadan sonra "Kanıt: <dosya yolu>:<satırlar>" ekle.\n- Yetersiz kanıt varsa "Doğrulanamadı" de.`;
+  }
+
+  const systemContent =
+    (dynamicContext
+      ? `${SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}`
+      : SYSTEM_PROMPT) + repositoryBlock;
 
   const chatMessages = [
     { role: "system", content: systemContent },
@@ -128,7 +181,43 @@ export async function POST(request) {
   }
 
   const stream = streamGroqTokens(groqRes);
-  return new Response(stream, {
+
+  if (!repoRequested) {
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-cache",
+      },
+    });
+  }
+
+  // Repository ile ilgili istekler için cevap ÖNCE tamamen toplanır, gerçek
+  // repository ağacı/kanıtıyla doğrulanır, yalnızca doğrulama geçerse (veya
+  // hiç teknik iddia içermiyorsa) kullanıcıya gönderilir. Bu, akış sırasında
+  // doğrulanamayan bir dosya/satır iddiasının kullanıcıya ulaşmasını engeller.
+  let finalText = await readStreamToString(stream);
+
+  if (repoAccessFailed) {
+    const claims = extractClaimedPaths(finalText);
+    if (claims.length > 0) {
+      finalText = REPOSITORY_ACCESS_FAILED_MESSAGE;
+    }
+  } else if (repoEvidence) {
+    const claims = extractClaimedPaths(finalText);
+    const { invalid: invalidPaths } = validateClaimedPaths(claims, repoEvidence.tree);
+    const invalidLines = validateLineRanges(claims, repoEvidence.sources);
+
+    if (invalidPaths.length > 0 || invalidLines.length > 0) {
+      finalText = REPOSITORY_UNVERIFIED_CLAIM_MESSAGE;
+    } else if (repoEvidence.sources.length > 0) {
+      const sourceLines = repoEvidence.sources.map((s) => `- ${s.path}:${s.lines}`).join("\n");
+      finalText += `\n\nKullanılan kaynaklar:\n${sourceLines}${
+        repoEvidence.commitShortSha ? `\nCommit: ${repoEvidence.commitShortSha}` : ""
+      }`;
+    }
+  }
+
+  return new Response(finalText, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-cache",
