@@ -32,7 +32,7 @@ export default function Home() {
   const [memoryOk, setMemoryOk] = useState(true);
   const [aiOk, setAiOk] = useState(null);
   const [lastError, setLastError] = useState("");
-  const [panel, setPanel] = useState("ozet");
+  const [panel, setPanel] = useState("chat");
 
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
