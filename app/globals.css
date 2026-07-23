@@ -305,6 +305,59 @@ body {
   flex-direction: column;
 }
 
+.osman-empty {
+  font-size: 13px;
+  color: #8a8a8a;
+  padding: 8px 0;
+}
+
+.osman-note {
+  font-size: 12px;
+  color: #9a9a9a;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.osman-warning {
+  margin: 10px 16px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #3a1f1f;
+  border: 1px solid #ff5c5c;
+  color: #ffb3b3;
+  font-size: 13px;
+}
+
+.osman-chat-toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px 0;
+  flex-wrap: wrap;
+}
+
+.osman-chat-toolbar button {
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #f0f0f0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.osman-chat-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.osman-loading {
+  text-align: center;
+  padding: 16px;
+  font-size: 13px;
+  color: #8a8a8a;
+}
+
 @media (max-width: 480px) {
   .osman-header h1 {
     font-size: 20px;

@@ -1,63 +1,42 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import {
-  createDefaultDecisions,
-  createDefaultProfile,
-  createDefaultProjects,
-  loadActiveProjectId,
-  loadDecisions,
-  loadProfile,
-  loadProjects,
-  newId,
-  saveActiveProjectId,
-  saveDecisions,
-  saveProfile,
-  saveProjects,
-  WELCOME_MESSAGE,
-} from "./lib/osman";
+import { useEffect, useMemo, useState } from "react";
 
-const PROFILE_FIELDS = [
-  { key: "isim", label: "İsim" },
-  { key: "meslekler", label: "Meslekler" },
-  { key: "yetenekler", label: "Yetenekler" },
-  { key: "ilgiAlanlari", label: "İlgi alanları" },
-  { key: "girisimcilik", label: "Girişimcilik / vizyon" },
-  { key: "calismaSekli", label: "Çalışma şekli" },
-  { key: "cevapTercihleri", label: "Cevap tercihleri" },
-];
+import Nav from "./components/Nav";
+import StatusBar from "./components/StatusBar";
+import ChatPanel from "./components/ChatPanel";
+import ProfilePanel from "./components/ProfilePanel";
+import RecordListPanel from "./components/RecordListPanel";
+import SystemHealthPanel from "./components/SystemHealthPanel";
+import DataManagementPanel from "./components/DataManagementPanel";
 
-const EMPTY_PROJECT_FORM = {
-  ad: "",
-  amac: "",
-  durum: "",
-  teknoloji: "",
-  repo: "",
-  sonYapilanIslem: "",
-  sonrakiAdim: "",
-  oncelik: "Orta",
-};
-
-const EMPTY_DECISION_FORM = { proje: "", karar: "" };
+import { loadProfile, saveProfile, resetProfile } from "./lib/data/profile";
+import { projectsCollection, PROJECT_FIELDS } from "./lib/data/projects";
+import { decisionsCollection, decisionFields } from "./lib/data/decisions";
+import { tasksCollection, taskFields } from "./lib/data/tasks";
+import { personalMemoryCollection, PERSONAL_MEMORY_FIELDS } from "./lib/data/personalMemory";
+import { futureProblemsCollection, FUTURE_PROBLEM_FIELDS } from "./lib/data/futureProblems";
+import { protocolsCollection, PROTOCOL_FIELDS } from "./lib/data/protocols";
+import { improvementsCollection, IMPROVEMENT_FIELDS } from "./lib/data/improvements";
+import { loadActiveProjectId, saveActiveProjectId } from "./lib/data/activeProject";
+import { isStorageAvailable } from "./lib/data/storage";
 
 export default function Home() {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [aiOk, setAiOk] = useState(null);
-  const listRef = useRef(null);
-
   const [ready, setReady] = useState(false);
+  const [memoryOk, setMemoryOk] = useState(true);
+  const [aiOk, setAiOk] = useState(null);
+  const [lastError, setLastError] = useState("");
+  const [panel, setPanel] = useState("chat");
+
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
   const [decisions, setDecisions] = useState([]);
+  const [tasks, setTasks] = useState([]);
+  const [personalMemory, setPersonalMemory] = useState([]);
+  const [futureProblems, setFutureProblems] = useState([]);
+  const [protocols, setProtocols] = useState([]);
+  const [improvements, setImprovements] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(null);
-
-  const [panel, setPanel] = useState(null); // null | "profil" | "projeler" | "kararlar"
-  const [profileDraft, setProfileDraft] = useState(null);
-  const [projectForm, setProjectForm] = useState(EMPTY_PROJECT_FORM);
-  const [editingProjectId, setEditingProjectId] = useState(null);
-  const [decisionForm, setDecisionForm] = useState(EMPTY_DECISION_FORM);
 
   useEffect(() => {
     fetch("/api/chat")
@@ -67,183 +46,61 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    let p = loadProfile();
-    if (!p) {
-      p = createDefaultProfile();
-      saveProfile(p);
+    const storageOk = isStorageAvailable();
+    setMemoryOk(storageOk);
+    if (!storageOk) {
+      setReady(true);
+      return;
     }
 
-    let pr = loadProjects();
-    if (!pr || pr.length === 0) {
-      pr = createDefaultProjects();
-      saveProjects(pr);
-    }
-
-    let d = loadDecisions();
-    if (!d) {
-      d = createDefaultDecisions();
-      saveDecisions(d);
-    }
-
+    const loadedProjects = projectsCollection.load();
     let activeId = loadActiveProjectId();
-    if (!activeId || !pr.some((item) => item.id === activeId)) {
-      activeId = pr[0]?.id || null;
+    if (!activeId || !loadedProjects.some((p) => p.id === activeId)) {
+      activeId = loadedProjects[0]?.id || null;
       if (activeId) saveActiveProjectId(activeId);
     }
 
-    setProfile(p);
-    setProfileDraft(p);
-    setProjects(pr);
-    setDecisions(d);
+    setProfile(loadProfile());
+    setProjects(loadedProjects);
+    setDecisions(decisionsCollection.load());
+    setTasks(tasksCollection.load());
+    setPersonalMemory(personalMemoryCollection.load());
+    setFutureProblems(futureProblemsCollection.load());
+    setProtocols(protocolsCollection.load());
+    setImprovements(improvementsCollection.load());
     setActiveProjectId(activeId);
     setReady(true);
   }, []);
 
-  useEffect(() => {
-    listRef.current?.scrollTo(0, listRef.current.scrollHeight);
-  }, [messages]);
-
   const activeProject = projects.find((p) => p.id === activeProjectId) || null;
+  const projectOptions = projects.map((p) => ({ value: p.id, label: p.ad }));
 
-  async function sendMessage(e) {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text || loading) return;
+  const projectDecisions = decisions.filter((d) => d.projeId === activeProjectId);
+  const projectTasks = tasks.filter((t) => t.projeId === activeProjectId);
 
-    const nextMessages = [...messages, { role: "user", content: text }];
-    setMessages(nextMessages);
-    setInput("");
-    setLoading(true);
+  const protocolsSummary = useMemo(() => {
+    if (!protocols.length) return "";
+    return "Stratejik araştırma projeleri: " + protocols.map((p) => `${p.ad} (${p.durum})`).join(", ");
+  }, [protocols]);
 
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: nextMessages,
-          context: { profile, activeProject, decisions },
-        }),
-      });
-      const data = await res.json();
+  const futureProblemsSummary = useMemo(() => {
+    if (!futureProblems.length) return "";
+    return `Gelecek araştırma kayıtları: ${futureProblems.length} adet.`;
+  }, [futureProblems]);
 
-      if (!res.ok) {
-        setMessages((prev) => [
-          ...prev,
-          { role: "error", content: data.error || "Bilinmeyen bir hata oluştu." },
-        ]);
-      } else {
-        setMessages((prev) => [...prev, { role: "assistant", content: data.reply }]);
-      }
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "error", content: "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et." },
-      ]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function togglePanel(name) {
-    setPanel((current) => (current === name ? null : name));
-  }
-
-  function handleProfileFieldChange(key, value) {
-    setProfileDraft((prev) => ({ ...prev, [key]: value }));
-  }
-
-  function saveProfileDraft() {
-    setProfile(profileDraft);
-    saveProfile(profileDraft);
-  }
-
-  function resetProfile() {
-    const defaults = createDefaultProfile();
-    setProfile(defaults);
-    setProfileDraft(defaults);
-    saveProfile(defaults);
-  }
-
-  function startEditProject(project) {
-    setEditingProjectId(project.id);
-    setProjectForm({
-      ad: project.ad,
-      amac: project.amac,
-      durum: project.durum,
-      teknoloji: project.teknoloji,
-      repo: project.repo,
-      sonYapilanIslem: project.sonYapilanIslem,
-      sonrakiAdim: project.sonrakiAdim,
-      oncelik: project.oncelik,
-    });
-  }
-
-  function cancelProjectForm() {
-    setEditingProjectId(null);
-    setProjectForm(EMPTY_PROJECT_FORM);
-  }
-
-  function submitProjectForm(e) {
-    e.preventDefault();
-    if (!projectForm.ad.trim()) return;
-    const today = new Date().toISOString().slice(0, 10);
-
-    let nextProjects;
-    if (editingProjectId) {
-      nextProjects = projects.map((p) =>
-        p.id === editingProjectId ? { ...p, ...projectForm, guncellenmeTarihi: today } : p
-      );
-    } else {
-      const newProject = { id: newId(), ...projectForm, guncellenmeTarihi: today };
-      nextProjects = [...projects, newProject];
-    }
-
-    setProjects(nextProjects);
-    saveProjects(nextProjects);
-    cancelProjectForm();
-
-    if (!activeProjectId && nextProjects.length === 1) {
-      setActiveProjectId(nextProjects[0].id);
-      saveActiveProjectId(nextProjects[0].id);
-    }
-  }
-
-  function deleteProject(id) {
-    const nextProjects = projects.filter((p) => p.id !== id);
-    setProjects(nextProjects);
-    saveProjects(nextProjects);
-    if (activeProjectId === id) {
-      const nextActive = nextProjects[0]?.id || null;
-      setActiveProjectId(nextActive);
-      saveActiveProjectId(nextActive);
-    }
-  }
+  const contextData = {
+    profile,
+    personalMemory,
+    activeProject,
+    projectDecisions,
+    projectTasks,
+    protocolsSummary,
+    futureProblemsSummary,
+  };
 
   function selectActiveProject(id) {
     setActiveProjectId(id);
     saveActiveProjectId(id);
-  }
-
-  function submitDecisionForm(e) {
-    e.preventDefault();
-    if (!decisionForm.karar.trim()) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const entry = {
-      id: newId(),
-      tarih: today,
-      proje: decisionForm.proje || activeProject?.ad || "Genel",
-      karar: decisionForm.karar.trim(),
-    };
-    const nextDecisions = [...decisions, entry];
-    setDecisions(nextDecisions);
-    saveDecisions(nextDecisions);
-    setDecisionForm(EMPTY_DECISION_FORM);
-  }
-
-  function deleteDecision(id) {
-    const nextDecisions = decisions.filter((d) => d.id !== id);
-    setDecisions(nextDecisions);
-    saveDecisions(nextDecisions);
   }
 
   return (
@@ -253,32 +110,18 @@ export default function Home() {
         <p>Osman'ın kişisel dijital zekâsı</p>
       </header>
 
-      <div className="osman-status">
-        <span>
-          <span className="dot ok" /> Sistem çalışıyor
-        </span>
-        <span>
-          <span className={`dot ${aiOk === null ? "" : aiOk ? "ok" : "fail"}`} />
-          {aiOk === null ? "AI bağlantısı kontrol ediliyor" : aiOk ? "AI bağlantısı çalışıyor" : "AI anahtarı eksik"}
-        </span>
-        <span>
-          <span className={`dot ${ready ? "ok" : ""}`} /> Hafıza çalışıyor
-        </span>
-      </div>
+      <StatusBar aiOk={aiOk} memoryOk={memoryOk} />
 
-      <nav className="osman-nav">
-        <button className={panel === "profil" ? "active" : ""} onClick={() => togglePanel("profil")}>
-          Osman Profili
-        </button>
-        <button className={panel === "projeler" ? "active" : ""} onClick={() => togglePanel("projeler")}>
-          Projeler
-        </button>
-        <button className={panel === "kararlar" ? "active" : ""} onClick={() => togglePanel("kararlar")}>
-          Kararlar
-        </button>
-      </nav>
+      {!memoryOk && (
+        <div className="osman-warning">
+          Bu tarayıcıda localStorage kullanılamıyor. Profil, proje ve karar hafızası bu cihazda çalışmayacak;
+          sohbet yine de çalışır ama hiçbir şey hatırlanmaz.
+        </div>
+      )}
 
-      {activeProject && (
+      <Nav active={panel} onSelect={setPanel} />
+
+      {projects.length > 0 && (
         <div className="osman-active-project">
           Aktif proje:
           <select value={activeProjectId || ""} onChange={(e) => selectActiveProject(e.target.value)}>
@@ -291,224 +134,124 @@ export default function Home() {
         </div>
       )}
 
-      {panel === "profil" && profileDraft && (
-        <div className="osman-panel">
-          <h2>Osman Profili</h2>
-          {PROFILE_FIELDS.map((field) => (
-            <label key={field.key} className="osman-field">
-              {field.label}
-              <textarea
-                value={profileDraft[field.key] || ""}
-                onChange={(e) => handleProfileFieldChange(field.key, e.target.value)}
-                rows={field.key === "isim" ? 1 : 2}
-              />
-            </label>
-          ))}
-          <div className="osman-panel-actions">
-            <button onClick={saveProfileDraft}>Kaydet</button>
-            <button className="secondary" onClick={resetProfile}>
-              Varsayılana sıfırla
-            </button>
-          </div>
-        </div>
+      {panel === "chat" && <ChatPanel contextData={contextData} onError={setLastError} />}
+
+      {panel === "profil" && profile && (
+        <ProfilePanel
+          profile={profile}
+          onSave={(next) => {
+            setProfile(next);
+            saveProfile(next);
+          }}
+          onReset={() => {
+            const next = resetProfile();
+            setProfile(next);
+            return next;
+          }}
+        />
       )}
 
       {panel === "projeler" && (
-        <div className="osman-panel">
-          <h2>Projeler</h2>
-          <div className="osman-list">
-            {projects.map((p) => (
-              <div key={p.id} className="osman-card">
-                <div className="osman-card-title">
-                  {p.ad} {p.id === activeProjectId && <span className="badge">aktif</span>}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Amaç:</strong> {p.amac}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Durum:</strong> {p.durum}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Teknoloji:</strong> {p.teknoloji}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Repo:</strong> {p.repo || "—"}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Son yapılan işlem:</strong> {p.sonYapilanIslem}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Sonraki adım:</strong> {p.sonrakiAdim}
-                </div>
-                <div className="osman-card-row">
-                  <strong>Öncelik:</strong> {p.oncelik} · <strong>Güncelleme:</strong> {p.guncellenmeTarihi}
-                </div>
-                <div className="osman-panel-actions">
-                  <button onClick={() => selectActiveProject(p.id)}>Aktif Yap</button>
-                  <button className="secondary" onClick={() => startEditProject(p)}>
-                    Düzenle
-                  </button>
-                  <button className="danger" onClick={() => deleteProject(p.id)}>
-                    Sil
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+        <RecordListPanel
+          title="Projeler"
+          fields={PROJECT_FIELDS}
+          records={projects}
+          onAdd={(values) => setProjects(projectsCollection.add(projects, values))}
+          onUpdate={(id, values) => setProjects(projectsCollection.update(projects, id, values))}
+          onDelete={(id) => {
+            const next = projectsCollection.remove(projects, id);
+            setProjects(next);
+            if (activeProjectId === id) {
+              const nextActive = next[0]?.id || null;
+              selectActiveProject(nextActive);
+            }
+          }}
+          renderCardExtra={(record) => (
+            <button onClick={() => selectActiveProject(record.id)}>
+              {record.id === activeProjectId ? "Aktif" : "Aktif Yap"}
+            </button>
+          )}
+        />
+      )}
 
-          <h3>{editingProjectId ? "Projeyi Düzenle" : "Yeni Proje Ekle"}</h3>
-          <form className="osman-project-form" onSubmit={submitProjectForm}>
-            <label className="osman-field">
-              Proje adı
-              <input
-                value={projectForm.ad}
-                onChange={(e) => setProjectForm((f) => ({ ...f, ad: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Amaç
-              <input
-                value={projectForm.amac}
-                onChange={(e) => setProjectForm((f) => ({ ...f, amac: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Mevcut durum
-              <input
-                value={projectForm.durum}
-                onChange={(e) => setProjectForm((f) => ({ ...f, durum: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Kullanılan teknoloji
-              <input
-                value={projectForm.teknoloji}
-                onChange={(e) => setProjectForm((f) => ({ ...f, teknoloji: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Repo / platform
-              <input
-                value={projectForm.repo}
-                onChange={(e) => setProjectForm((f) => ({ ...f, repo: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Son yapılan işlem
-              <input
-                value={projectForm.sonYapilanIslem}
-                onChange={(e) => setProjectForm((f) => ({ ...f, sonYapilanIslem: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Sonraki adım
-              <input
-                value={projectForm.sonrakiAdim}
-                onChange={(e) => setProjectForm((f) => ({ ...f, sonrakiAdim: e.target.value }))}
-              />
-            </label>
-            <label className="osman-field">
-              Öncelik
-              <select
-                value={projectForm.oncelik}
-                onChange={(e) => setProjectForm((f) => ({ ...f, oncelik: e.target.value }))}
-              >
-                <option>Yüksek</option>
-                <option>Orta</option>
-                <option>Düşük</option>
-              </select>
-            </label>
-            <div className="osman-panel-actions">
-              <button type="submit">{editingProjectId ? "Güncelle" : "Ekle"}</button>
-              {editingProjectId && (
-                <button type="button" className="secondary" onClick={cancelProjectForm}>
-                  Vazgeç
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
+      {panel === "gorevler" && (
+        <RecordListPanel
+          title="Görevler"
+          fields={taskFields(projectOptions)}
+          records={tasks}
+          onAdd={(values) => setTasks(tasksCollection.add(tasks, values))}
+          onUpdate={(id, values) => setTasks(tasksCollection.update(tasks, id, values))}
+          onDelete={(id) => setTasks(tasksCollection.remove(tasks, id))}
+        />
       )}
 
       {panel === "kararlar" && (
-        <div className="osman-panel">
-          <h2>Kararlar</h2>
-          <div className="osman-list">
-            {decisions
-              .slice()
-              .reverse()
-              .map((d) => (
-                <div key={d.id} className="osman-card">
-                  <div className="osman-card-row">
-                    <strong>{d.tarih}</strong> · {d.proje}
-                  </div>
-                  <div className="osman-card-row">{d.karar}</div>
-                  <div className="osman-panel-actions">
-                    <button className="danger" onClick={() => deleteDecision(d.id)}>
-                      Sil
-                    </button>
-                  </div>
-                </div>
-              ))}
-          </div>
-
-          <h3>Yeni Karar Ekle</h3>
-          <form className="osman-project-form" onSubmit={submitDecisionForm}>
-            <label className="osman-field">
-              İlgili proje
-              <select
-                value={decisionForm.proje || activeProject?.ad || ""}
-                onChange={(e) => setDecisionForm((f) => ({ ...f, proje: e.target.value }))}
-              >
-                <option value="">Genel</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.ad}>
-                    {p.ad}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="osman-field">
-              Karar
-              <textarea
-                rows={2}
-                value={decisionForm.karar}
-                onChange={(e) => setDecisionForm((f) => ({ ...f, karar: e.target.value }))}
-              />
-            </label>
-            <div className="osman-panel-actions">
-              <button type="submit">Kaydet</button>
-            </div>
-          </form>
-        </div>
+        <RecordListPanel
+          title="Kararlar"
+          fields={decisionFields(projectOptions)}
+          records={decisions}
+          onAdd={(values) => setDecisions(decisionsCollection.add(decisions, values))}
+          onUpdate={(id, values) => setDecisions(decisionsCollection.update(decisions, id, values))}
+          onDelete={(id) => setDecisions(decisionsCollection.remove(decisions, id))}
+        />
       )}
 
-      <div className="osman-messages" ref={listRef}>
-        {messages.length === 0 && <div className="msg assistant">{WELCOME_MESSAGE}</div>}
-        {messages.map((m, i) => (
-          <div key={i} className={`msg ${m.role}`}>
-            {m.content}
-          </div>
-        ))}
-        {loading && <div className="msg assistant">Yazıyor…</div>}
-      </div>
-
-      <form className="osman-form" onSubmit={sendMessage}>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              sendMessage(e);
-            }
-          }}
-          placeholder="Mesajını yaz..."
-          rows={1}
+      {panel === "hafiza" && (
+        <RecordListPanel
+          title="Kişisel Hafıza"
+          fields={PERSONAL_MEMORY_FIELDS}
+          records={personalMemory}
+          onAdd={(values) => setPersonalMemory(personalMemoryCollection.add(personalMemory, values))}
+          onUpdate={(id, values) => setPersonalMemory(personalMemoryCollection.update(personalMemory, id, values))}
+          onDelete={(id) => setPersonalMemory(personalMemoryCollection.remove(personalMemory, id))}
         />
-        <button type="submit" disabled={loading}>
-          Gönder
-        </button>
-      </form>
+      )}
+
+      {panel === "gelecek" && (
+        <RecordListPanel
+          title="Gelecek Problemleri Araştırması"
+          fields={FUTURE_PROBLEM_FIELDS}
+          records={futureProblems}
+          onAdd={(values) => setFutureProblems(futureProblemsCollection.add(futureProblems, values))}
+          onUpdate={(id, values) => setFutureProblems(futureProblemsCollection.update(futureProblems, id, values))}
+          onDelete={(id) => setFutureProblems(futureProblemsCollection.remove(futureProblems, id))}
+        />
+      )}
+
+      {panel === "protokoller" && (
+        <RecordListPanel
+          title="AI Security Protocol / AI Payment Protocol"
+          fields={PROTOCOL_FIELDS}
+          records={protocols}
+          protectedIds={protocolsCollection.protectedIds}
+          onAdd={(values) => setProtocols(protocolsCollection.add(protocols, values))}
+          onUpdate={(id, values) => setProtocols(protocolsCollection.update(protocols, id, values))}
+          onDelete={(id) => setProtocols(protocolsCollection.remove(protocols, id))}
+        />
+      )}
+
+      {panel === "sistem" && (
+        <>
+          <SystemHealthPanel aiOk={aiOk} memoryOk={memoryOk} activeProject={activeProject} lastError={lastError} />
+          <RecordListPanel
+            title="Sürekli Gelişim Notları"
+            fields={IMPROVEMENT_FIELDS}
+            records={improvements}
+            onAdd={(values) => setImprovements(improvementsCollection.add(improvements, values))}
+            onUpdate={(id, values) => setImprovements(improvementsCollection.update(improvements, id, values))}
+            onDelete={(id) => setImprovements(improvementsCollection.remove(improvements, id))}
+          />
+        </>
+      )}
+
+      {panel === "veri" && (
+        <DataManagementPanel
+          onAfterImport={() => window.location.reload()}
+          onAfterWipe={() => window.location.reload()}
+        />
+      )}
+
+      {!ready && <div className="osman-loading">Yükleniyor…</div>}
     </div>
   );
 }

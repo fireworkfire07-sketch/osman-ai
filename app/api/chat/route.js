@@ -1,10 +1,53 @@
-import { OSMAN_SYSTEM_PROMPT, buildMemoryContext } from "../../lib/osman";
+import { SYSTEM_PROMPT } from "../../lib/core";
+import { buildDynamicContext } from "../../lib/context";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
 export async function GET() {
   return Response.json({ groqKeyPresent: Boolean(process.env.GROQ_API_KEY) });
+}
+
+function streamGroqTokens(groqRes) {
+  const reader = groqRes.body.getReader();
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = "";
+
+  return new ReadableStream({
+    async start(controller) {
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const rawLine of lines) {
+            const line = rawLine.trim();
+            if (!line.startsWith("data:")) continue;
+            const payload = line.slice(5).trim();
+            if (payload === "[DONE]") {
+              controller.close();
+              return;
+            }
+            try {
+              const json = JSON.parse(payload);
+              const token = json?.choices?.[0]?.delta?.content;
+              if (token) controller.enqueue(encoder.encode(token));
+            } catch {
+              // Bozuk/yarım satır — yok say, akış devam etsin.
+            }
+          }
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+  });
 }
 
 export async function POST(request) {
@@ -24,11 +67,11 @@ export async function POST(request) {
   }
 
   const history = Array.isArray(body?.messages) ? body.messages : [];
-  const memoryContext = buildMemoryContext(body?.context || {});
+  const dynamicContext = buildDynamicContext(body?.context || {});
 
-  const systemContent = memoryContext
-    ? `${OSMAN_SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${memoryContext}`
-    : OSMAN_SYSTEM_PROMPT;
+  const systemContent = dynamicContext
+    ? `${SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}`
+    : SYSTEM_PROMPT;
 
   const chatMessages = [
     { role: "system", content: systemContent },
@@ -37,8 +80,9 @@ export async function POST(request) {
       .map((m) => ({ role: m.role, content: String(m.content || "") })),
   ];
 
+  let groqRes;
   try {
-    const groqRes = await fetch(GROQ_URL, {
+    groqRes = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -47,27 +91,10 @@ export async function POST(request) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         temperature: 0.6,
+        stream: true,
         messages: chatMessages,
       }),
     });
-
-    if (!groqRes.ok) {
-      const detail = await groqRes.text();
-      console.error("GROQ_API_ERROR", groqRes.status, detail);
-      return Response.json(
-        { error: "AI servisinden cevap alınamadı. Lütfen birazdan tekrar dene." },
-        { status: 502 }
-      );
-    }
-
-    const data = await groqRes.json();
-    const reply = data?.choices?.[0]?.message?.content?.trim();
-
-    if (!reply) {
-      return Response.json({ error: "AI boş cevap döndürdü. Lütfen tekrar dene." }, { status: 502 });
-    }
-
-    return Response.json({ reply });
   } catch (err) {
     console.error("GROQ_REQUEST_FAILED", err);
     return Response.json(
@@ -75,4 +102,21 @@ export async function POST(request) {
       { status: 502 }
     );
   }
+
+  if (!groqRes.ok) {
+    const detail = await groqRes.text();
+    console.error("GROQ_API_ERROR", groqRes.status, detail);
+    return Response.json(
+      { error: "AI servisinden cevap alınamadı. Lütfen birazdan tekrar dene." },
+      { status: 502 }
+    );
+  }
+
+  const stream = streamGroqTokens(groqRes);
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-cache",
+    },
+  });
 }

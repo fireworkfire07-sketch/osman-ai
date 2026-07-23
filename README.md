@@ -1,10 +1,10 @@
-# OSMAN AI — V2
+# OSMAN AI — V2–V5
 
-Osman'ın kişisel dijital zekâsı. V1'in çalışan sohbet ekranının üzerine Osman profili, proje hafızası ve karar hafızası eklendi.
+Osman'ın dijital ikizi: kişisel yapay zekâsı, proje yöneticisi, fikir ortağı, araştırma asistanı ve iş geliştirme ortağı. Çalışan V1 sohbet çekirdeğinin üzerine katman katman eklendi; hiçbiri çalışan sohbeti/GROQ bağlantısını bozmadı.
 
 ## Kullanılan teknolojiler
 
-- Next.js (web arayüzü)
+- Next.js (web arayüzü, streaming API route)
 - Vercel (ücretsiz barındırma)
 - GROQ API (ücretsiz, kredi kartı istemeyen AI servisi, model: `llama-3.3-70b-versatile`)
 
@@ -47,31 +47,46 @@ Tarayıcıda `http://localhost:3000` adresini aç.
 
 API anahtarı yalnızca Vercel'in sunucu tarafında tutulur, tarayıcı koduna hiçbir zaman yazılmaz.
 
+## Mimari
+
+```
+app/lib/core/       Değişmez çekirdek — Personality + Brain (kimlik, karar prensipleri,
+                     cevap kuralları, proje/para/sanat/girişimcilik/güvenlik yaklaşımı).
+                     Yalnızca kod değişikliğiyle değişir, hiçbir ekrandan düzenlenemez.
+app/lib/data/        Değişebilir veri — profil, projeler, kararlar, görevler, kişisel
+                     hafıza, gelecek problemleri, stratejik protokoller, sürekli gelişim
+                     notları, sohbet geçmişi. Hepsi tarayıcı localStorage'ında.
+app/lib/context.js   Değişken veriyi (profil + aktif proje + kararları + görevleri +
+                     protokol/gelecek özetini) sunucuya gönderilecek bağlam metnine çevirir.
+app/api/chat/route.js  Core + bağlamı birleştirir, GROQ'a stream:true ile gönderir,
+                     token'ları anlık olarak tarayıcıya akıtır.
+app/components/      Sohbet ve her veri katmanı için yeniden kullanılabilir arayüz.
+app/page.js          Tüm katmanları yükleyip birbirine bağlayan ana ekran.
+```
+
 ## Şu an çalışan özellikler
 
-- Kullanıcı mesajı gönderme, GROQ üzerinden gerçek AI cevabı alma
-- Sistem durumu göstergesi (sistem çalışıyor / AI bağlantısı çalışıyor / hafıza çalışıyor)
-- Türkçe, anlaşılır hata mesajları
-- Mobil ve tablet uyumlu koyu tema arayüz
-- **Osman Profili**: meslekler, yetenekler, ilgi alanları, girişimcilik/vizyon, çalışma şekli, cevap tercihleri — görüntülenebilir, düzenlenebilir, varsayılana sıfırlanabilir
-- **Proje hafızası**: her projede amaç, durum, teknoloji, repo, son yapılan işlem, sonraki adım, öncelik — eklenebilir, düzenlenebilir, silinebilir; aynı anda tek bir **aktif proje** seçilir
-- **Karar hafızası**: tarihli, ilgili projeye bağlı kararlar — eklenebilir, silinebilir
-- Sohbet cevabı üretilirken Osman'ın profili, aktif projesi ve son kararları otomatik olarak AI'a bağlam olarak verilir
-- İlk açılışta (sohbet geçmişi boşken) Osman'ı tanıyan sabit bir karşılama mesajı gösterilir
-- Önceden yüklenmiş iki stratejik araştırma projesi: **AI Security Protocol** ve **AI Payment Protocol**
+- Türkçe sohbet, GROQ'tan **canlı akan (streaming)** gerçek AI cevabı
+- Sohbet geçmişi cihazda kalıcı — sayfa yenilenince kaybolmaz; **Yeni Sohbet** ve **Konuşmayı Dışa Aktar** (.txt) butonları
+- Sistem durumu göstergesi + ayrıntılı **Sistem Durumu** paneli (AI bağlantısı, hafıza durumu, aktif proje, son hata, sürüm/build bilgisi)
+- **Osman Profili** — meslekler, yetenekler, ilgi alanları, sanatsal alanlar, çalışma tercihleri, hedefler; görüntülenebilir, düzenlenebilir, varsayılana sıfırlanabilir
+- **Proje hafızası** — amaç, durum, teknoloji, repo, çalışan/çalışmayan özellikler, hatalar, sonraki adım, öncelik; tek bir **aktif proje** seçimi
+- **Görev sistemi** — projeye bağlı, durumu (Bekliyor/Yapılıyor/Tamamlandı/Hata oluştu) ve test yöntemi olan görevler
+- **Karar hafızası** — projeye bağlı, tarihli, durumlu kararlar
+- **Kişisel Hafıza** — kategori/başlık/içerik ile manuel not kaydı
+- **Gelecek Problemleri Araştırması** — henüz projeye dönüşmemiş fikir/problem takibi
+- **AI Security Protocol** ve **AI Payment Protocol** — sabit, silinemez iki stratejik araştırma kaydı (düzenlenebilir)
+- **Sürekli Gelişim Notları** — eksik/öneri/teknik borç/güvenlik riski kaydı (yalnızca not; otomatik uygulanmaz)
+- **Veri Yönetimi** — tüm veriyi tek dosyada yedekle (indir), başka bir yedekten içe aktar, tüm veriyi temizle (hepsi onay ister)
+- Sohbet her mesajda Osman'ın profilini, aktif projesini, o projenin kararlarını/görevlerini ve stratejik projelerin özetini otomatik olarak AI'a bağlam olarak verir
+- İlk açılışta (sohbet geçmişi boşken) Osman'ı tanıyan sabit bir karşılama mesajı gösterilir, sonraki mesajlarda tekrarlanmaz
 
 ## Hafıza nerede tutuluyor?
 
-**Tarayıcının `localStorage`'ında — cihaz üzerinde, sunucuda değil.** Vercel'in sunucu fonksiyonları her istekte sıfırdan çalıştığı için (disk üzerinde kalıcı hafızası yoktur) profil/proje/karar verisi tarayıcıda saklanır ve her sohbet isteğiyle birlikte sunucuya gönderilir.
+**Tarayıcının `localStorage`'ında — cihaz üzerinde, sunucuda değil.** Vercel'in sunucu fonksiyonları her istekte sıfırdan çalıştığı için (disk üzerinde kalıcı hafızası yoktur) tüm veri tarayıcıda saklanır ve sohbet isteğiyle birlikte sunucuya gönderilir.
 
-**Önemli sınır:** Bu veri yalnızca kullandığın cihaz/tarayıcıda kalır — telefon ile tablet arasında otomatik senkronize olmaz. Tarayıcı verilerini temizlersen (veya farklı bir cihaz/tarayıcı kullanırsan) profil/proje/karar hafızası da o cihazda sıfırdan başlar. Cihazlar arası senkronizasyon istenirse bir sonraki aşamada ücretsiz bir veritabanı (ör. Supabase) eklenir.
+**Önemli sınır:** Bu veri yalnızca kullandığın cihaz/tarayıcıda kalır — telefon ile tablet arasında otomatik senkronize olmaz. Cihazlar arası taşımak istersen **Veri Yönetimi** panelinden yedek indirip diğer cihazda içe aktarabilirsin. Otomatik senkronizasyon istenirse bir sonraki aşamada ücretsiz bir veritabanı (ör. Supabase) eklenir.
 
-## Henüz yok (sonraki sürüm)
+## Bilinçli olarak eklenmeyenler
 
-- Cihazlar arası hafıza senkronizasyonu
-- Sohbet geçmişinin ayrıca dışa aktarılması
-- Gelişim Motoru / Gelecek Araştırma Motoru gibi otonom V3 modülleri (bunlar bilinçli olarak eklenmedi — bkz. aşağıdaki not)
-
-## V3 hakkında not
-
-V3 tanımındaki "Gelişim Motoru" ve "Gelecek Araştırma Motoru" gibi kendi kendine öneri üreten otonom sistemler bu sürümde **kurulmadı**. Bunlar sürekli çalışan (zamanlanmış) arka plan görevleri gerektirir ve V3'ün kendi kuralı da onay olmadan hiçbir kritik değişiklik yapılmamasını şart koşar. Bunun yerine V3'ün stratejik içeriği — Osman'ın araştırmacı/yatırımcı vizyonu ve AI Security/Payment Protocol projeleri — profile ve proje hafızasına veri olarak işlendi. Otonom motorları kurmak istersen bu ayrı, açıkça onaylanmış bir sonraki adım olmalı.
+"Gelişim Motoru" ve "Gelecek Araştırma Motoru" gibi kendi kendine öneri üretip otomatik çalışan sistemler kurulmadı. Bunlar sürekli çalışan (zamanlanmış) arka plan görevleri gerektirir ve OSMAN AI'ın kendi kuralı da onay olmadan kritik değişiklik yapılmamasını şart koşar. Bunun yerine bu katman, Osman'ın manuel olarak dolduracağı bir "Sürekli Gelişim Notları" listesi olarak eklendi.
