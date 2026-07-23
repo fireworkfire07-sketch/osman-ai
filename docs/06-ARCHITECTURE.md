@@ -6,15 +6,19 @@
 app/
   layout.js                   Kök HTML iskeleti, meta/viewport
   page.js                     Ana ekran — tüm katmanları yükler, panelleri yönlendirir
+  error.js                    Genel hata sınırı — beklenmeyen render hatalarında güvenli kurtarma ekranı
   globals.css                 Tüm stiller (koyu tema, panel/kart/form/nav/dashboard)
-  api/chat/route.js           Tek sunucu endpoint'i — GROQ'a streaming istek
+  api/chat/
+    route.js                 Tek sunucu endpoint'i — oran sınırlama + GROQ'a streaming istek
+    rateLimit.js              IP başına in-memory oran sınırlama (ücretsiz GROQ kotasını korur)
   lib/
     core/
       personality.js          Sabit kimlik + ses tonu
       brain.js                 Sabit karar/cevap/proje/güvenlik/sanat/girişimcilik kuralları
       index.js                 SYSTEM_PROMPT, APP_VERSION, BUILD_INFO, WELCOME_MESSAGE
     data/
-      storage.js               localStorage oku/yaz/sil + newId() + today() + isStorageAvailable()
+      storage.js               localStorage oku/yaz/sil + newId() + today() + isStorageAvailable() + son hata takibi
+      schema.js                 Tek kaynaklı şema sürümü + göç (migration) + yedekten geri yükleme
       keys.js                  STORAGE_KEYS — tüm localStorage anahtarlarının tek kaynağı
       options.js               Paylaşılan PRIORITY_OPTIONS
       collection.js            Liste-tipi veri için genel CRUD fabrikası
@@ -30,8 +34,8 @@ app/
       improvements.js          Sürekli Gelişim Notları (collection)
       chatHistory.js           Sohbet geçmişi oku/yaz/temizle
       activeProject.js         Aktif proje id'si oku/yaz
-    context.js                 Değişken veriyi API bağlam metnine çevirir
-    dataManagement.js          Tüm veriyi dışa aktar / içe aktar / temizle
+    context.js                 Değişken veriyi, sınırlandırılmış (son N kayıt + karakter tavanı) bağlam metnine çevirir
+    dataManagement.js          Dışa aktar / doğrulamalı içe aktar / temizle
   components/
     Nav.js                     12 sekmelik gezinme
     StatusBar.js                Üst durum noktaları (AI/hafıza)
@@ -41,7 +45,8 @@ app/
     DashboardCards.js             Özet ekranı kartları
     TodayPanel.js                 Bugün paneli
     SystemHealthPanel.js          Sistem Durumu ayrıntı paneli
-    DataManagementPanel.js        Yedekle/içe aktar/temizle arayüzü
+    DataManagementPanel.js        Yedekle/doğrulamalı içe aktar/temizle arayüzü + rapor
+tests/                         npm test — rate limit, bağlam sınırlama, içe aktarma doğrulama, şema göçü
 docs/                          Bu doküman seti
 CLAUDE.md, CONTRIBUTING.md, README.md, .env.example, package.json, next.config.js
 ```

@@ -1,5 +1,6 @@
 import { SYSTEM_PROMPT } from "../../lib/core";
 import { buildDynamicContext } from "../../lib/context";
+import { checkRateLimit, getClientIp } from "./rateLimit";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
@@ -51,6 +52,20 @@ function streamGroqTokens(groqRes) {
 }
 
 export async function POST(request) {
+  // Oran sınırlaması, GROQ anahtarının varlığından bile önce kontrol edilir:
+  // amaç yalnızca gerçek GROQ isteklerini değil, bu endpoint'e yapılan her
+  // türlü kötüye kullanımı erken reddetmektir.
+  const clientIp = getClientIp(request);
+  const rateLimit = checkRateLimit(clientIp);
+  if (!rateLimit.allowed) {
+    return Response.json(
+      {
+        error: `Çok fazla mesaj gönderildi. Ücretsiz AI kotasını korumak için lütfen ${rateLimit.retryAfterSeconds} saniye sonra tekrar dene.`,
+      },
+      { status: 429 }
+    );
+  }
+
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return Response.json(

@@ -16,6 +16,19 @@ Tüm veri tarayıcı `localStorage`'ında tutulur (bkz. `08-MEMORY-SYSTEM.md`). 
 | `improvements` | `osman-ai:improvements` | Dizi (kayıt) |
 | `activeProjectId` | `osman-ai:active-project-id` | Tekil string |
 
+## Şema Sürümleme ve Migrasyon
+
+**Durum: ÇALIŞIYOR.** Tek sürüm kaynağı `app/lib/data/schema.js` → `CURRENT_SCHEMA_VERSION`; sürüm numarası `osman-ai:schema-version` anahtarında tutulur. Sayfa her açıldığında (`app/page.js`'in ilk `useEffect`'i) `applyMigrations()` bir kez çağrılır:
+
+1. Kayıtlı sürüm `CURRENT_SCHEMA_VERSION`'a eşit veya büyükse hiçbir şeye dokunulmaz.
+2. Değilse: **önce** tüm `STORAGE_KEYS` verisinin tam bir kopyası `osman-ai:pre-migration-backup` anahtarına yazılır.
+3. `MIGRATIONS` dizisindeki, mevcut sürümden hedef sürüme kadar olan adımlar sırayla uygulanır (bugün `MIGRATIONS` boştur — sürüm 1, sürümlemenin başladığı temel noktadır, herhangi bir alan dönüşümü içermez).
+4. Bir adım hata fırlatırsa, adım 2'deki yedekten **aynen** geri yüklenir; kullanıcı verisi hiçbir zaman yarım veya bozuk kalmaz. Sürüm numarası bu durumda güncellenmez (bir sonraki yüklemede tekrar denenir).
+
+Gelecekte bir alan adı/şekli değiştiğinde (ör. `futureProblems.baslik` yeniden adlandırılırsa), `MIGRATIONS` dizisine `{ to: <yeni sürüm>, migrate(all) { ...; return all; } }` biçiminde bir adım eklenir — başka hiçbir dosyada sürüm bilgisi tutulmaz.
+
+Test kapsamı: `tests/schema.test.mjs` — saf `runMigrationPipeline` mantığı, "sürüm güncel" no-op davranışı, "sürüm eksik" (0 kabul edilir) geçişi, ve kasıtlı olarak bozuk bir migrasyon adımıyla yedekten geri yükleme senaryosu.
+
 ## Kimlik ve tarih üretimi (ortak)
 
 `app/lib/data/storage.js`:

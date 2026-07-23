@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "node --import ./tests/register-loader.mjs --test tests/*.test.mjs"
   },
   "dependencies": {
     "next": "^16.2.11",

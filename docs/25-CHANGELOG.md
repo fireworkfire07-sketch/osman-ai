@@ -28,9 +28,24 @@ Future Research alan seti genişletildi, Project Analyzer alanları eklendi, AI 
 
 ## Master Spec v1.0 — Dokümantasyon sistemi
 
+**Commit:** `a3cec2e` — "docs: add OSMAN AI Master Spec v1.0"
+
+`docs/` klasörü altında 26 doküman, kök dizinde `CLAUDE.md` ve `CONTRIBUTING.md` eklendi; `README.md` sadeleştirilip ana dokümana bağlantı verildi. Bu bir kod değişikliği değildi — uygulama dosyalarına dokunulmadı.
+
+## Kritik/Yüksek düzeltme sprinti — teknik denetim bulgularının giderilmesi
+
 **Commit:** (bu değişiklik ile oluşturuldu — bkz. commit geçmişi)
 
-`docs/` klasörü altında 26 doküman, kök dizinde `CLAUDE.md` ve `CONTRIBUTING.md` eklendi; `README.md` sadeleştirilip ana dokümana bağlantı verildi. **Bu bir kod değişikliği değildir** — uygulama dosyalarına dokunulmadı.
+Master Spec sonrası yapılan teknik denetimde bulunan Kritik ve Yüksek öncelikli 5 soruna karşılık:
+
+- **İçe aktarma artık çökmüyor:** `validateImportData()` her alanın tipini doğruluyor, uyuşmayanlar Türkçe raporla atlanıyor, mevcut veri bozulmuyor.
+- **Genel hata sınırı:** `app/error.js`, herhangi bir beklenmeyen render hatasını (bozuk import dışındaki senaryolar dahil) yakalayıp güvenli bir kurtarma ekranı gösteriyor — doğrulandı: elle bozulmuş bir localStorage değeriyle gerçekten tetiklenip "Tüm Veriyi Temizle" ile gerçekten kurtarıyor.
+- **Oran sınırlama:** `/api/chat`, IP başına 5 dakikada 20 istekle sınırlı (ücretsiz, veritabanısız, Vercel-uyumlu en basit yöntem); gerçek sunucuda 22 art arda istekle doğrulandı (20 geçti, 21. ve sonrası 429 Türkçe mesajla reddedildi).
+- **Bağlam sınırlama:** Sohbete gönderilen kararlar/görevler son 5 kayıtla, toplam bağlam 4.000 karakterle sınırlandı; Core Brain ve profil değişmedi.
+- **Şema sürümleme ve göç:** `app/lib/data/schema.js`, tek kaynaklı sürüm + yedekten-geri-yükleyen göç altyapısı ekliyor; bozuk bir göç adımıyla gerçek geri yükleme testle doğrulandı.
+- **Sessiz hata yutma bitti:** `storage.js` artık son hatayı saklıyor, Sistem Durumu panelinde gösteriliyor; simüle edilmiş kota hatasıyla doğrulandı.
+
+`tests/` altında Node'un yerleşik test çalıştırıcısıyla (`npm test`, yeni bağımlılık yok) 18 otomatik test eklendi. Hiçbir mevcut özellik kaldırılmadı, hiçbir ücretli servis/veritabanı eklenmedi.
 
 ## Değişiklik kaydetme kuralı
 

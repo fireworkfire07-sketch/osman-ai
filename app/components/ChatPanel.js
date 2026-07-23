@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { clearChatHistory, loadChatHistory, saveChatHistory } from "../lib/data/chatHistory";
+import { getLastStorageError, clearLastStorageError } from "../lib/data/storage";
 import { downloadText } from "../lib/dataManagement";
 import { WELCOME_MESSAGE } from "../lib/core";
 
@@ -18,7 +19,13 @@ export default function ChatPanel({ contextData, onError }) {
   }, []);
 
   useEffect(() => {
-    if (loadedFromStorage) saveChatHistory(messages);
+    if (!loadedFromStorage) return;
+    saveChatHistory(messages);
+    const storageErr = getLastStorageError();
+    if (storageErr) {
+      onError?.(storageErr);
+      clearLastStorageError();
+    }
   }, [messages, loadedFromStorage]);
 
   useEffect(() => {

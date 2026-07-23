@@ -1,3 +1,5 @@
+let lastStorageError = null;
+
 export function newId() {
   if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -19,22 +21,35 @@ export function isStorageAvailable() {
   }
 }
 
+// writeJSON/readJSON hatayı artık sessizce yutmuyor: son hata burada saklanır,
+// getLastStorageError() ile okunup üst katmanda (Sistem Durumu) gösterilebilir.
+export function getLastStorageError() {
+  return lastStorageError;
+}
+
+export function clearLastStorageError() {
+  lastStorageError = null;
+}
+
 export function readJSON(key, fallback) {
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
+    lastStorageError = `Kayıtlı veri okunamadı (${key}). Varsayılan değerler kullanıldı.`;
     return fallback;
   }
 }
 
 export function writeJSON(key, value) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined") return true;
   try {
     window.localStorage.setItem(key, JSON.stringify(value));
+    return true;
   } catch {
-    // localStorage dolu ya da devre dışı — sessizce yok say, üst katman durumu gösterir.
+    lastStorageError = "Hafızaya yazılamadı (depolama alanı dolu olabilir). Son değişiklik kaydedilmemiş olabilir.";
+    return false;
   }
 }
 

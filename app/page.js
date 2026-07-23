@@ -22,7 +22,8 @@ import { securityProtocolRecord, SECURITY_PROTOCOL_FIELDS } from "./lib/data/sec
 import { paymentProtocolRecord, PAYMENT_PROTOCOL_FIELDS } from "./lib/data/paymentProtocol";
 import { improvementsCollection, IMPROVEMENT_FIELDS } from "./lib/data/improvements";
 import { loadActiveProjectId, saveActiveProjectId } from "./lib/data/activeProject";
-import { isStorageAvailable } from "./lib/data/storage";
+import { isStorageAvailable, getLastStorageError, clearLastStorageError } from "./lib/data/storage";
+import { applyMigrations } from "./lib/data/schema";
 
 const PROJECT_ALL_FIELDS = [...PROJECT_FIELDS, ...PROJECT_ANALYZER_FIELDS];
 
@@ -44,6 +45,23 @@ export default function Home() {
   const [improvements, setImprovements] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(null);
 
+  // Herhangi bir localStorage okuma/yazma işleminden sonra çağrılır; storage.js
+  // sessizce yutmak yerine son hatayı burada saklar, biz onu görünür kılarız
+  // (Sistem Durumu panelindeki "Son hata" alanı).
+  function reportStorageErrorIfAny() {
+    const err = getLastStorageError();
+    if (err) {
+      setLastError(err);
+      clearLastStorageError();
+    }
+  }
+
+  function runStorageAction(action) {
+    const result = action();
+    reportStorageErrorIfAny();
+    return result;
+  }
+
   useEffect(() => {
     fetch("/api/chat")
       .then((res) => res.json())
@@ -57,6 +75,11 @@ export default function Home() {
     if (!storageOk) {
       setReady(true);
       return;
+    }
+
+    const migrationResult = applyMigrations();
+    if (!migrationResult.ok) {
+      setLastError(migrationResult.error);
     }
 
     const loadedProjects = projectsCollection.load();
@@ -76,6 +99,7 @@ export default function Home() {
     setPaymentProtocol(paymentProtocolRecord.load());
     setImprovements(improvementsCollection.load());
     setActiveProjectId(activeId);
+    reportStorageErrorIfAny();
     setReady(true);
   }, []);
 
@@ -113,6 +137,7 @@ export default function Home() {
   function selectActiveProject(id) {
     setActiveProjectId(id);
     saveActiveProjectId(id);
+    reportStorageErrorIfAny();
   }
 
   return (
@@ -177,10 +202,10 @@ export default function Home() {
           record={profile}
           onSave={(next) => {
             setProfile(next);
-            profileRecord.save(next);
+            runStorageAction(() => profileRecord.save(next));
           }}
           onReset={() => {
-            const next = profileRecord.reset();
+            const next = runStorageAction(() => profileRecord.reset());
             setProfile(next);
             return next;
           }}
@@ -193,10 +218,10 @@ export default function Home() {
           title="Projeler"
           fields={PROJECT_ALL_FIELDS}
           records={projects}
-          onAdd={(values) => setProjects(projectsCollection.add(projects, values))}
-          onUpdate={(id, values) => setProjects(projectsCollection.update(projects, id, values))}
+          onAdd={(values) => setProjects(runStorageAction(() => projectsCollection.add(projects, values)))}
+          onUpdate={(id, values) => setProjects(runStorageAction(() => projectsCollection.update(projects, id, values)))}
           onDelete={(id) => {
-            const next = projectsCollection.remove(projects, id);
+            const next = runStorageAction(() => projectsCollection.remove(projects, id));
             setProjects(next);
             if (activeProjectId === id) {
               const nextActive = next[0]?.id || null;
@@ -216,9 +241,9 @@ export default function Home() {
           title="Görevler"
           fields={taskFields(projectOptions)}
           records={tasks}
-          onAdd={(values) => setTasks(tasksCollection.add(tasks, values))}
-          onUpdate={(id, values) => setTasks(tasksCollection.update(tasks, id, values))}
-          onDelete={(id) => setTasks(tasksCollection.remove(tasks, id))}
+          onAdd={(values) => setTasks(runStorageAction(() => tasksCollection.add(tasks, values)))}
+          onUpdate={(id, values) => setTasks(runStorageAction(() => tasksCollection.update(tasks, id, values)))}
+          onDelete={(id) => setTasks(runStorageAction(() => tasksCollection.remove(tasks, id)))}
         />
       )}
 
@@ -227,9 +252,9 @@ export default function Home() {
           title="Kararlar"
           fields={decisionFields(projectOptions)}
           records={decisions}
-          onAdd={(values) => setDecisions(decisionsCollection.add(decisions, values))}
-          onUpdate={(id, values) => setDecisions(decisionsCollection.update(decisions, id, values))}
-          onDelete={(id) => setDecisions(decisionsCollection.remove(decisions, id))}
+          onAdd={(values) => setDecisions(runStorageAction(() => decisionsCollection.add(decisions, values)))}
+          onUpdate={(id, values) => setDecisions(runStorageAction(() => decisionsCollection.update(decisions, id, values)))}
+          onDelete={(id) => setDecisions(runStorageAction(() => decisionsCollection.remove(decisions, id)))}
         />
       )}
 
@@ -238,9 +263,11 @@ export default function Home() {
           title="Kişisel Hafıza"
           fields={PERSONAL_MEMORY_FIELDS}
           records={personalMemory}
-          onAdd={(values) => setPersonalMemory(personalMemoryCollection.add(personalMemory, values))}
-          onUpdate={(id, values) => setPersonalMemory(personalMemoryCollection.update(personalMemory, id, values))}
-          onDelete={(id) => setPersonalMemory(personalMemoryCollection.remove(personalMemory, id))}
+          onAdd={(values) => setPersonalMemory(runStorageAction(() => personalMemoryCollection.add(personalMemory, values)))}
+          onUpdate={(id, values) =>
+            setPersonalMemory(runStorageAction(() => personalMemoryCollection.update(personalMemory, id, values)))
+          }
+          onDelete={(id) => setPersonalMemory(runStorageAction(() => personalMemoryCollection.remove(personalMemory, id)))}
         />
       )}
 
@@ -249,9 +276,13 @@ export default function Home() {
           title="Gelecek Problemleri Araştırması"
           fields={FUTURE_PROBLEM_FIELDS}
           records={futureProblems}
-          onAdd={(values) => setFutureProblems(futureProblemsCollection.add(futureProblems, values))}
-          onUpdate={(id, values) => setFutureProblems(futureProblemsCollection.update(futureProblems, id, values))}
-          onDelete={(id) => setFutureProblems(futureProblemsCollection.remove(futureProblems, id))}
+          onAdd={(values) => setFutureProblems(runStorageAction(() => futureProblemsCollection.add(futureProblems, values)))}
+          onUpdate={(id, values) =>
+            setFutureProblems(runStorageAction(() => futureProblemsCollection.update(futureProblems, id, values)))
+          }
+          onDelete={(id) =>
+            setFutureProblems(runStorageAction(() => futureProblemsCollection.remove(futureProblems, id)))
+          }
         />
       )}
 
@@ -262,7 +293,7 @@ export default function Home() {
           record={securityProtocol}
           onSave={(next) => {
             setSecurityProtocol(next);
-            securityProtocolRecord.save(next);
+            runStorageAction(() => securityProtocolRecord.save(next));
           }}
         />
       )}
@@ -274,7 +305,7 @@ export default function Home() {
           record={paymentProtocol}
           onSave={(next) => {
             setPaymentProtocol(next);
-            paymentProtocolRecord.save(next);
+            runStorageAction(() => paymentProtocolRecord.save(next));
           }}
         />
       )}
@@ -286,9 +317,11 @@ export default function Home() {
             title="Sürekli Gelişim Notları"
             fields={IMPROVEMENT_FIELDS}
             records={improvements}
-            onAdd={(values) => setImprovements(improvementsCollection.add(improvements, values))}
-            onUpdate={(id, values) => setImprovements(improvementsCollection.update(improvements, id, values))}
-            onDelete={(id) => setImprovements(improvementsCollection.remove(improvements, id))}
+            onAdd={(values) => setImprovements(runStorageAction(() => improvementsCollection.add(improvements, values)))}
+            onUpdate={(id, values) =>
+              setImprovements(runStorageAction(() => improvementsCollection.update(improvements, id, values)))
+            }
+            onDelete={(id) => setImprovements(runStorageAction(() => improvementsCollection.remove(improvements, id)))}
           />
         </>
       )}

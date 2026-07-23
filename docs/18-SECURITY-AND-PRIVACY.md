@@ -31,7 +31,11 @@ Tek dış hizmet: GROQ API. Her sohbet isteğinde yalnızca o anki mesajlar + ba
 
 ## İçe/dışa aktarma
 
-İçe aktarma, mevcut verinin **üzerine yazar** — bu geri alınamaz bir işlemdir ve `window.confirm()` ile onay ister (bkz. `07-DATA-MODEL.md`).
+**Durum: ÇALIŞIYOR, doğrulamalı.** İçe aktarma öncesi `validateImportData()` (`app/lib/dataManagement.js`) her alanın beklenen tipte (dizi/nesne/string) olup olmadığını kontrol eder; yalnızca geçerli alanlar mevcut verinin **üzerine yazılır** (bu kısım hâlâ geri alınamaz, `window.confirm()` ister), geçersiz/eksik şekilli alanlar dokunulmadan atlanır ve kullanıcıya Türkçe bir rapor gösterilir. Sayfa yenilemesi otomatik değildir — kullanıcı raporu okuduktan sonra "Tamam, Sayfayı Yenile" ile devam eder.
+
+## Genel hata sınırı (error boundary)
+
+**Durum: ÇALIŞIYOR.** `app/error.js`, beklenmeyen herhangi bir render hatasını (ör. doğrulama adımını atlayan, elle bozulmuş bir localStorage değeri) yakalar ve beyaz ekran yerine "Tekrar dene" veya "Tüm Veriyi Temizle ve Yeniden Başlat" seçeneği sunan bir kurtarma ekranı gösterir. Temizleme onay ister ve geri alınamaz.
 
 ## XSS riski
 
@@ -44,6 +48,12 @@ Sohbet mesajları ve bağlam metni doğrudan GROQ'a gönderilir. Kullanıcı (Os
 ## Yetkilendirme
 
 Uygulamada oturum açma/kullanıcı hesabı sistemi yoktur (ERTELENDİ). Uygulamaya erişebilen herkes tüm verileri görebilir/değiştirebilir — bu tek kullanıcılı, kişisel kullanım senaryosu için kabul edilmiş bir risktir.
+
+## Oran sınırlama (rate limiting)
+
+**Durum: ÇALIŞIYOR.** `app/api/chat/rateLimit.js`, `/api/chat` POST uç noktasını IP başına 5 dakikada 20 istekle sınırlar (normal bir sohbet kullanımı için bolca yeterli, art arda otomatik kötüye kullanımı engelleyecek kadar sıkı). Limit aşılırsa `429` durum koduyla Türkçe, bekleme süresini belirten bir hata döner. Bu kontrol, GROQ anahtarının varlığından bile önce yapılır — amaç yalnızca gerçek AI isteklerini değil, uç noktaya yapılan her türlü kötüye kullanımı erken reddetmektir.
+
+**Sınır (dürüstçe belirtilmeli):** Bu, Vercel'in serverless yapısında bellek-içi (in-memory) bir sayaçtır — yalnızca aynı sıcak (warm) fonksiyon örneği içinde kalıcıdır, soğuk başlangıçta veya farklı bir bölgede/örnekte sıfırlanır. Ücretli bir servis veya yeni bir veritabanı gerektirmeyen en basit yöntemdir, ama global/dağıtık bir garanti **değildir** — birden fazla kaynaktan gelen dağıtık bir saldırıyı tam olarak engelleyemez. Test kapsamı: `tests/rateLimit.test.mjs`.
 
 ## Kullanıcı onayı
 

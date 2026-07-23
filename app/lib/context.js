@@ -2,6 +2,17 @@
 // Çekirdek (Personality+Brain) sabittir ve burada değil app/lib/core'da durur;
 // bu dosya yalnızca DEĞİŞEBİLİR veriyi (profil, aktif proje, kararlar,
 // görevler, kişisel hafıza, stratejik projeler) kısa bir metne çevirir.
+//
+// Sınırlar bilinçlidir: yalnızca aktif projenin EN GÜNCEL birkaç kararı/görevi
+// eklenir (tamamı değil), ve toplam metin bir güvenlik sınırına kırpılır.
+// Bu, GROQ'un ücretsiz kotasındaki dakikalık token limitine (6.000 TPM)
+// zamanla yaklaşmayı önlemek içindir — proje büyüdükçe prompt boyutu
+// sınırsız büyümez.
+const MAX_RECENT_DECISIONS = 5;
+const MAX_RECENT_TASKS = 5;
+const MAX_PERSONAL_MEMORY = 3;
+const MAX_CONTEXT_CHARS = 4000;
+
 export function buildDynamicContext({
   profile,
   personalMemory = [],
@@ -20,7 +31,7 @@ export function buildDynamicContext({
   }
 
   if (personalMemory.length) {
-    const recent = personalMemory.slice(-3);
+    const recent = personalMemory.slice(-MAX_PERSONAL_MEMORY);
     parts.push("Bilinen kişisel notlar: " + recent.map((m) => `${m.baslik}: ${m.icerik}`).join(" | "));
   }
 
@@ -31,18 +42,26 @@ export function buildDynamicContext({
   }
 
   if (projectDecisions.length) {
+    const recent = projectDecisions.slice(-MAX_RECENT_DECISIONS);
+    const note = projectDecisions.length > recent.length ? ` (son ${MAX_RECENT_DECISIONS}, toplam ${projectDecisions.length})` : "";
     parts.push(
-      "Bu projeye ait kararlar: " +
-        projectDecisions.map((d) => `[${d.tarih}] ${d.baslik}: ${d.aciklama} (${d.durum})`).join(" ")
+      `Bu projeye ait güncel kararlar${note}: ` +
+        recent.map((d) => `[${d.tarih}] ${d.baslik}: ${d.aciklama} (${d.durum})`).join(" ")
     );
   }
 
   if (projectTasks.length) {
-    parts.push("Bu projenin görevleri: " + projectTasks.map((t) => `${t.ad} (${t.durum})`).join(", "));
+    const recent = projectTasks.slice(-MAX_RECENT_TASKS);
+    const note = projectTasks.length > recent.length ? ` (son ${MAX_RECENT_TASKS}, toplam ${projectTasks.length})` : "";
+    parts.push(`Bu projenin güncel görevleri${note}: ` + recent.map((t) => `${t.ad} (${t.durum})`).join(", "));
   }
 
   if (protocolsSummary) parts.push(protocolsSummary);
   if (futureProblemsSummary) parts.push(futureProblemsSummary);
 
-  return parts.join("\n");
+  let result = parts.join("\n");
+  if (result.length > MAX_CONTEXT_CHARS) {
+    result = result.slice(0, MAX_CONTEXT_CHARS) + "\n[Bağlam uzunluk sınırı nedeniyle kısaltıldı.]";
+  }
+  return result;
 }

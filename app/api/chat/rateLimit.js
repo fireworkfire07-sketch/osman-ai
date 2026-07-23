@@ -1,0 +1,43 @@
+// GROQ ücretsiz günlük kotasını (14.400 istek/gün) korumak için IP başına
+// en-basit, sunucu-içi (in-memory) oran sınırlama. Ücretli bir servis veya
+// yeni bir veritabanı gerektirmez; Vercel'in serverless yapısında bu Map
+// yalnızca aynı sıcak (warm) fonksiyon örneği içinde kalıcıdır — soğuk
+// başlangıçta veya farklı bölgede/örnekte sıfırlanır. Bu yüzden mükemmel
+// (global, dağıtık) bir sınırlama DEĞİLDİR; tek bir IP'den gelen hızlı,
+// art arda kötüye kullanımı engelleyen en basit, ücretsiz önlemdir.
+const WINDOW_MS = 5 * 60 * 1000; // 5 dakika
+const MAX_REQUESTS_PER_WINDOW = 20; // normal bir sohbet için bolca yeterli
+const MAX_TRACKED_IPS = 500; // sınırsız büyümeyi önlemek için basit bir tavan
+
+const buckets = new Map();
+
+export function checkRateLimit(ip, now = Date.now()) {
+  if (buckets.size > MAX_TRACKED_IPS) {
+    buckets.clear();
+  }
+
+  const bucket = buckets.get(ip);
+  if (!bucket || now - bucket.windowStart > WINDOW_MS) {
+    buckets.set(ip, { count: 1, windowStart: now });
+    return { allowed: true };
+  }
+
+  if (bucket.count >= MAX_REQUESTS_PER_WINDOW) {
+    const retryAfterSeconds = Math.ceil((WINDOW_MS - (now - bucket.windowStart)) / 1000);
+    return { allowed: false, retryAfterSeconds };
+  }
+
+  bucket.count += 1;
+  return { allowed: true };
+}
+
+export function getClientIp(request) {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) return forwardedFor.split(",")[0].trim();
+  return request.headers.get("x-real-ip") || "unknown";
+}
+
+// Yalnızca testler için: sayaçları sıfırlar.
+export function _resetRateLimitState() {
+  buckets.clear();
+}

@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
-import { downloadJSON, exportAllData, importAllData, wipeAllData } from "../lib/dataManagement";
+import { useRef, useState } from "react";
+import { downloadJSON, exportAllData, fieldLabel, importAllData, wipeAllData } from "../lib/dataManagement";
 
 export default function DataManagementPanel({ onAfterImport, onAfterWipe }) {
   const fileInputRef = useRef(null);
+  const [importReport, setImportReport] = useState(null);
 
   function handleBackup() {
     const data = exportAllData();
@@ -12,6 +13,7 @@ export default function DataManagementPanel({ onAfterImport, onAfterWipe }) {
   }
 
   function handleImportClick() {
+    setImportReport(null);
     fileInputRef.current?.click();
   }
 
@@ -20,16 +22,23 @@ export default function DataManagementPanel({ onAfterImport, onAfterWipe }) {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
+      let data;
       try {
-        const data = JSON.parse(String(reader.result));
-        if (!window.confirm("İçe aktarma, cihazdaki mevcut OSMAN AI verilerinin üzerine yazacak. Devam edilsin mi?")) {
-          return;
-        }
-        importAllData(data);
-        onAfterImport();
+        data = JSON.parse(String(reader.result));
       } catch {
-        window.alert("Dosya okunamadı. Geçerli bir OSMAN AI yedek dosyası (.json) seçtiğinden emin ol.");
+        setImportReport({ errors: ["Dosya okunamadı: geçerli bir JSON dosyası değil."], imported: [], skipped: [] });
+        return;
       }
+
+      if (!window.confirm("İçe aktarma, geçerli görünen alanların üzerine yazacak. Diğer verilerin dokunulmadan kalacak. Devam edilsin mi?")) {
+        return;
+      }
+
+      const result = importAllData(data);
+      setImportReport(result);
+      // Sayfa burada otomatik yenilenmez: kullanıcı önce hangi alanların içe
+      // aktarıldığını/atlandığını okuyabilsin diye yenileme "Tamam, Sayfayı
+      // Yenile" butonuna bırakılır (bkz. aşağıdaki rapor kutusu).
     };
     reader.readAsText(file);
     e.target.value = "";
@@ -66,6 +75,31 @@ export default function DataManagementPanel({ onAfterImport, onAfterWipe }) {
         onChange={handleFileChange}
         style={{ display: "none" }}
       />
+
+      {importReport && (
+        <div className="osman-card" style={{ marginTop: 12 }}>
+          {importReport.imported.length > 0 && (
+            <div className="osman-card-row">
+              <strong>İçe aktarıldı:</strong> {importReport.imported.map(fieldLabel).join(", ")}
+            </div>
+          )}
+          {importReport.skipped.length > 0 && (
+            <div className="osman-card-row">
+              <strong>Atlandı (mevcut veri korundu):</strong> {importReport.skipped.map(fieldLabel).join(", ")}
+            </div>
+          )}
+          {importReport.errors.map((err, i) => (
+            <div className="osman-card-row" key={i}>
+              {err}
+            </div>
+          ))}
+          {importReport.imported.length > 0 && (
+            <div className="osman-panel-actions">
+              <button onClick={onAfterImport}>Tamam, Sayfayı Yenile</button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
