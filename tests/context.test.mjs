@@ -47,3 +47,22 @@ test("buildDynamicContext: az sayıda kayıt varken 'toplam' notu eklenmez", () 
   });
   assert.ok(!ctx.includes("toplam"));
 });
+
+test("buildDynamicContext: tüm projeler isim ve durumuyla bağlama dahil edilir", () => {
+  const ctx = buildDynamicContext({
+    allProjects: [
+      { ad: "OSMAN AI", durum: "Aktif" },
+      { ad: "AI Security Protocol", durum: "Araştırılıyor" },
+    ],
+  });
+  assert.ok(ctx.includes("OSMAN AI (Aktif)"));
+  assert.ok(ctx.includes("AI Security Protocol (Araştırılıyor)"));
+});
+
+test("buildDynamicContext: proje listesi ilk N ile sınırlanır ve toplam belirtilir", () => {
+  const manyProjects = Array.from({ length: 15 }, (_, i) => ({ ad: `Proje ${i}`, durum: "Aktif" }));
+  const ctx = buildDynamicContext({ allProjects: manyProjects });
+  assert.ok(ctx.includes("Proje 9 (Aktif)"), "ilk 10 proje dahil olmalı");
+  assert.ok(!ctx.includes("Proje 10 ("), "10. projeden sonrası dahil edilmemeli");
+  assert.ok(ctx.includes("toplam 15"));
+});

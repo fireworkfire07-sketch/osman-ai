@@ -11,12 +11,14 @@
 const MAX_RECENT_DECISIONS = 5;
 const MAX_RECENT_TASKS = 5;
 const MAX_PERSONAL_MEMORY = 3;
+const MAX_PROJECTS_LISTED = 10;
 const MAX_CONTEXT_CHARS = 4000;
 
 export function buildDynamicContext({
   profile,
   personalMemory = [],
   activeProject,
+  allProjects = [],
   projectDecisions = [],
   projectTasks = [],
   protocolsSummary,
@@ -33,6 +35,13 @@ export function buildDynamicContext({
   if (personalMemory.length) {
     const recent = personalMemory.slice(-MAX_PERSONAL_MEMORY);
     parts.push("Bilinen kişisel notlar: " + recent.map((m) => `${m.baslik}: ${m.icerik}`).join(" | "));
+  }
+
+  if (allProjects.length) {
+    const listed = allProjects.slice(0, MAX_PROJECTS_LISTED);
+    const note =
+      allProjects.length > listed.length ? ` (ilk ${MAX_PROJECTS_LISTED}, toplam ${allProjects.length})` : "";
+    parts.push(`Kayıtlı tüm projeler${note}: ` + listed.map((p) => `${p.ad} (${p.durum})`).join(", "));
   }
 
   if (activeProject) {

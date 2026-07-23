@@ -24,8 +24,8 @@ export default function GlobalError({ error, reset }) {
   }
 
   return (
-    <div id="osman-app">
-      <header className="osman-header">
+    <div className="osman-error-page">
+      <header className="osman-error-header">
         <h1>OSMAN AI</h1>
         <p>Osman'ın kişisel dijital zekâsı</p>
       </header>

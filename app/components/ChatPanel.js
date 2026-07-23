@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { clearChatHistory, loadChatHistory, saveChatHistory } from "../lib/data/chatHistory";
 import { getLastStorageError, clearLastStorageError } from "../lib/data/storage";
 import { downloadText } from "../lib/dataManagement";
-import { WELCOME_MESSAGE } from "../lib/core";
+import { WELCOME_MESSAGE, QUICK_START_PROMPTS } from "../lib/core";
 
 export default function ChatPanel({ contextData, onError }) {
   const [messages, setMessages] = useState([]);
@@ -32,9 +32,9 @@ export default function ChatPanel({ contextData, onError }) {
     listRef.current?.scrollTo(0, listRef.current.scrollHeight);
   }, [messages, loading]);
 
-  async function sendMessage(e) {
-    e.preventDefault();
-    const text = input.trim();
+  async function sendMessage(e, overrideText) {
+    e?.preventDefault?.();
+    const text = (overrideText ?? input).trim();
     if (!text || loading) return;
 
     const nextMessages = [...messages, { role: "user", content: text }];
@@ -97,8 +97,15 @@ export default function ChatPanel({ contextData, onError }) {
     }
   }
 
+  function sendQuickStart(text) {
+    sendMessage(null, text);
+  }
+
   function newChat() {
-    if (messages.length > 0 && !window.confirm("Yeni sohbet başlatılsın mı? Mevcut sohbet geçmişi bu cihazdan silinecek.")) {
+    if (
+      messages.length > 0 &&
+      !window.confirm("Yeni sohbet başlatılsın mı? Mevcut sohbet geçmişi bu cihazdan silinecek.")
+    ) {
       return;
     }
     setMessages([]);
@@ -113,8 +120,10 @@ export default function ChatPanel({ contextData, onError }) {
     downloadText(`osman-ai-sohbet-${new Date().toISOString().slice(0, 10)}.txt`, lines.join("\n\n"));
   }
 
+  const isEmpty = loadedFromStorage && messages.length === 0;
+
   return (
-    <>
+    <div className="osman-chat">
       <div className="osman-chat-toolbar">
         <button className="secondary" onClick={newChat}>
           Yeni Sohbet
@@ -124,17 +133,38 @@ export default function ChatPanel({ contextData, onError }) {
         </button>
       </div>
 
-      <div className="osman-messages" ref={listRef}>
-        {messages.length === 0 && <div className="msg assistant">{WELCOME_MESSAGE}</div>}
-        {messages.map((m, i) => {
-          const isStreamingPlaceholder = loading && i === messages.length - 1 && m.role === "assistant" && m.content === "";
-          return (
-            <div key={i} className={`msg ${m.role}`}>
-              {isStreamingPlaceholder ? "Yazıyor…" : m.content}
-            </div>
-          );
-        })}
-      </div>
+      {isEmpty ? (
+        <div className="osman-chat-empty">
+          <h2>{WELCOME_MESSAGE}</h2>
+          <div className="osman-quick-starts">
+            {QUICK_START_PROMPTS.map((q) => (
+              <button key={q} className="osman-quick-start" onClick={() => sendQuickStart(q)}>
+                {q}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="osman-messages" ref={listRef}>
+          {messages.map((m, i) => {
+            const isStreamingPlaceholder =
+              loading && i === messages.length - 1 && m.role === "assistant" && m.content === "";
+            return (
+              <div key={i} className={`msg ${m.role}`}>
+                {isStreamingPlaceholder ? (
+                  <span className="osman-typing">
+                    <span />
+                    <span />
+                    <span />
+                  </span>
+                ) : (
+                  m.content
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <form className="osman-form" onSubmit={sendMessage}>
         <textarea
@@ -152,6 +182,6 @@ export default function ChatPanel({ contextData, onError }) {
           Gönder
         </button>
       </form>
-    </>
+    </div>
   );
 }

@@ -47,6 +47,28 @@ Master Spec sonrası yapılan teknik denetimde bulunan Kritik ve Yüksek önceli
 
 `tests/` altında Node'un yerleşik test çalıştırıcısıyla (`npm test`, yeni bağımlılık yok) 18 otomatik test eklendi. Hiçbir mevcut özellik kaldırılmadı, hiçbir ücretli servis/veritabanı eklenmedi.
 
+## Sohbeti ana ekran yapma
+
+**Commit:** `518c580` — "Make chat the default visible panel on the homepage"
+
+`ChatPanel.js` zaten her gereksinimi karşılıyordu; tek eksik varsayılan açılış ekranının Özet olmasıydı. `page.js`'de `panel` state'inin varsayılanı `"chat"` yapıldı. Başka hiçbir dosya değişmedi.
+
+## Premium tasarım sistemi sprinti — sidebar, tek tasarım dili, dijital ikiz bağlamı
+
+**Commit:** (bu değişiklik ile oluşturuldu — bkz. commit geçmişi)
+
+Teknik olarak çalışan ama amatör görünen arayüz, mevcut `/api/chat`, veri katmanı ve testler bozulmadan yeniden tasarlandı:
+
+- **Sidebar gezinmesi:** `Nav.js` + `StatusBar.js` kaldırıldı, yerine `Sidebar.js` geldi — masaüstünde sabit sol sidebar, mobil/tablette (<1024px) açılır/kapanır menü. Yatay sekme scroll'u tamamen kaldırıldı.
+- **Sohbet ana odak:** İlk açılışta uzun profil metni yerine kısa bir karşılama ("Merhaba Osman. Bugün ne üzerinde çalışıyoruz?") ve 3 hızlı başlangıç önerisi gösteriliyor.
+- **Tek tasarım sistemi:** `globals.css` CSS değişkenleriyle (renk/boşluk/radius) baştan yazıldı; tek vurgu rengi, tutarlı tipografi, tüm panellerde aynı kart/form/buton ölçüleri.
+- **Genel liste bileşeni genişletildi:** `RecordListPanel.js` artık arama, durum/öncelik filtresi, tıklayınca açılan detay görünümü ve gizlenebilir ekleme formu sunuyor — Projeler/Görevler/Kararlar/Hafıza/Araştırmalar aynı bileşeni kullanmaya devam ediyor.
+- **Özet ekranı yeniden tasarlandı:** "Bugünkü Durum" başlığı altında 4 sade kart (Aktif Proje/Açık Görev/Bekleyen Karar/Hafıza Kaydı, anlamsız "0" yerine açıklayıcı boş durum metni) + Bugün/Yaklaşan Görevler/Son Kararlar liste bölümleri.
+- **Dijital ikiz bağlamı genişletildi:** `context.js` artık kayıtlı **tüm projelerin** isim ve durumunu (ilk 10, bağlam sınırı korunarak) sohbete gönderiyor; Brain'e "kayıtlı isim/durumları kullan, bilmediğini 'Bu bilgi kayıtlı değil' diyerek belirt" kuralı eklendi — `/api/chat` ve GROQ entegrasyonu hiç değişmedi.
+- **Nested scroll düzeltildi:** Panellerdeki sabit `max-height:45vh` kaldırıldı; ana içerik alanı tek bir kontrollü scroll kullanıyor, sohbet ekranı kendi mesaj listesini ayrı kaydırıyor (sabit alt giriş kutusu).
+
+`tests/context.test.mjs`'e yeni bağlam alanı (`allProjects`) için 2 test eklendi (toplam 20 test, `npm test` ile hâlâ çalışıyor). Hiçbir localStorage anahtarı, veri şekli veya API sözleşmesi değişmedi; migration gerekmedi.
+
 ## Değişiklik kaydetme kuralı
 
 Her yeni sürüm/sprint tamamlandığında bu dosyaya yeni bir bölüm eklenir: sürüm adı, gerçek commit SHA'sı, kısa ve doğru bir özet.

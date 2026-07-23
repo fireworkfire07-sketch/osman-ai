@@ -1,30 +1,71 @@
 "use client";
 
-export default function TodayPanel({ lastTask, lastDecision, lastProject, activeProject, openResearch }) {
+function projectName(projects, id) {
+  return projects.find((p) => p.id === id)?.ad || null;
+}
+
+export default function TodayPanel({ activeProject, tasks, decisions, projects }) {
+  const openTasks = tasks
+    .filter((t) => t.durum !== "Tamamlandı")
+    .slice(-5)
+    .reverse();
+  const recentDecisions = [...decisions].slice(-5).reverse();
+
   return (
-    <div className="osman-panel">
-      <h2>Bugün</h2>
-      <div className="osman-card">
-        <div className="osman-card-row">
-          <strong>Son görev:</strong> {lastTask ? `${lastTask.ad} (${lastTask.durum})` : "yok"}
+    <>
+      <section className="osman-list-section">
+        <h3 className="osman-section-subtitle">Bugün</h3>
+        <div className="osman-simple-card">
+          {activeProject ? (
+            <>
+              <strong>{activeProject.ad}</strong>
+              <p>{activeProject.sonrakiAdim || "Sonraki adım tanımlı değil."}</p>
+            </>
+          ) : (
+            <p className="osman-empty">Aktif proje seçilmedi.</p>
+          )}
         </div>
-        <div className="osman-card-row">
-          <strong>Son karar:</strong> {lastDecision ? `${lastDecision.baslik}` : "yok"}
-        </div>
-        <div className="osman-card-row">
-          <strong>Son proje:</strong> {lastProject ? lastProject.ad : "yok"}
-        </div>
-        <div className="osman-card-row">
-          <strong>Devam edilmesi gereken iş:</strong>{" "}
-          {activeProject ? `${activeProject.ad}: ${activeProject.sonrakiAdim || "sonraki adım tanımlı değil"}` : "aktif proje yok"}
-        </div>
-        <div className="osman-card-row">
-          <strong>Açık araştırmalar:</strong>{" "}
-          {openResearch && openResearch.length
-            ? openResearch.map((r) => r.baslik).join(", ")
-            : "yok"}
-        </div>
-      </div>
-    </div>
+      </section>
+
+      <section className="osman-list-section">
+        <h3 className="osman-section-subtitle">Yaklaşan Görevler</h3>
+        {openTasks.length === 0 ? (
+          <p className="osman-empty">Açık görev yok.</p>
+        ) : (
+          <ul className="osman-simple-list">
+            {openTasks.map((t) => (
+              <li key={t.id}>
+                <span className="osman-row-title">{t.ad}</span>
+                <span className="osman-row-meta">
+                  {t.oncelik && <span className="osman-tag">{t.oncelik}</span>}
+                  {t.projeId && projectName(projects, t.projeId) && (
+                    <span className="osman-row-sub">{projectName(projects, t.projeId)}</span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="osman-list-section">
+        <h3 className="osman-section-subtitle">Son Kararlar</h3>
+        {recentDecisions.length === 0 ? (
+          <p className="osman-empty">Henüz karar yok.</p>
+        ) : (
+          <ul className="osman-simple-list">
+            {recentDecisions.map((d) => (
+              <li key={d.id}>
+                <span className="osman-row-title">{d.baslik}</span>
+                <span className="osman-row-meta">
+                  <span className={`osman-tag${d.durum === "Aktif" ? " accent" : ""}`}>{d.durum}</span>
+                  {d.tarih && <span className="osman-row-sub">{d.tarih}</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

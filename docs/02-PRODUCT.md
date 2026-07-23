@@ -6,22 +6,27 @@ Bu doküman, OSMAN AI'ın bugün gerçekten ne olduğunu anlatır. Hayalî veya 
 
 Next.js ile yazılmış, Vercel'de barındırılan, tek sayfalık (client-side sekme geçişli) bir web uygulaması. Sunucu tarafında GROQ API'sine bağlanan tek bir API route'u (`/api/chat`) vardır. Kalan tüm veri tarayıcının `localStorage`'ında tutulur.
 
-## Mevcut ekranlar (Nav sekmeleri)
+## Mevcut ekranlar (Sidebar gezinmesi)
 
-`app/components/Nav.js` içindeki gerçek sekme listesi:
+`app/components/Sidebar.js` içindeki gerçek gezinme listesi. Masaüstünde sabit sol sidebar, mobil/tablette (<1024px) açılır/kapanır bir menü olarak çalışır. Birincil grup:
 
-1. **Özet** (`ozet`) — varsayılan açılış ekranı. Dashboard kartları + Bugün paneli. **ÇALIŞIYOR**
-2. **Sohbet** (`chat`) — Türkçe, streaming AI cevabı. **ÇALIŞIYOR**
-3. **Profil** (`profil`) — Osman Profili, tek kayıt. **ÇALIŞIYOR**
-4. **Projeler** (`projeler`) — proje listesi + Project Analyzer alanları. **ÇALIŞIYOR**
-5. **Görevler** (`gorevler`) — görev listesi. **ÇALIŞIYOR**
-6. **Kararlar** (`kararlar`) — karar listesi. **ÇALIŞIYOR**
-7. **Hafıza** (`hafiza`) — Kişisel Hafıza listesi. **ÇALIŞIYOR**
-8. **Gelecek Problemleri** (`gelecek`) — Future Research kayıtları. **ÇALIŞIYOR**
+1. **Sohbet** (`chat`) — varsayılan açılış ekranı. Kısa karşılama + 3 hızlı başlangıç önerisi, Türkçe streaming AI cevabı. **ÇALIŞIYOR**
+2. **Özet** (`ozet`) — "Bugünkü Durum" kartları (Aktif Proje/Açık Görev/Bekleyen Karar/Hafıza Kaydı) + Bugün/Yaklaşan Görevler/Son Kararlar listeleri. **ÇALIŞIYOR**
+3. **Projeler** (`projeler`) — proje listesi + Project Analyzer alanları, arama/filtre, tıklayınca detay açılır. **ÇALIŞIYOR**
+4. **Görevler** (`gorevler`) — görev listesi. **ÇALIŞIYOR**
+5. **Kararlar** (`kararlar`) — karar listesi. **ÇALIŞIYOR**
+6. **Hafıza** (`hafiza`) — Kişisel Hafıza listesi. **ÇALIŞIYOR**
+7. **Araştırmalar** (`gelecek`) — Future Research kayıtları. **ÇALIŞIYOR**
+8. **Profil** (`profil`) — Osman Profili, tek kayıt. **ÇALIŞIYOR**
+
+İkincil grup (mevcut fonksiyonlar korunuyor, birincil listeyi kalabalıklaştırmamak için sidebar'da ayrı ve daha küçük bir bölümde):
+
 9. **AI Security Protocol** (`security`) — tekil stratejik kayıt. **ÇALIŞIYOR** (veri/arayüz), **ARAŞTIRMA AŞAMASINDA** (içerik/vizyon)
 10. **AI Payment Protocol** (`payment`) — tekil stratejik kayıt. **ÇALIŞIYOR** (veri/arayüz), **ARAŞTIRMA AŞAMASINDA** (içerik/vizyon)
 11. **Sistem Durumu** (`sistem`) — SystemHealthPanel + Sürekli Gelişim Notları. **ÇALIŞIYOR**
 12. **Veri Yönetimi** (`veri`) — yedekle/içe aktar/temizle. **ÇALIŞIYOR**
+
+Aktif proje seçici ve AI/hafıza durum noktaları artık sidebar'ın alt kısmında (footer) yer alır; ayrı bir üst bar olarak gösterilmez.
 
 ## Kullanılan teknolojiler
 
@@ -39,7 +44,8 @@ Next.js ile yazılmış, Vercel'de barındırılan, tek sayfalık (client-side s
 | Türkçe sohbet, streaming cevap | ÇALIŞIYOR | `/api/chat` SSE parse edip token akıtıyor |
 | Sohbet geçmişi kalıcılığı | ÇALIŞIYOR | `localStorage:osman-ai:chat-history` |
 | Yeni Sohbet / Konuşmayı Dışa Aktar | ÇALIŞIYOR | `.txt` indirme |
-| Sistem durumu göstergesi (üst bar) | ÇALIŞIYOR | AI bağlantısı + hafıza durumu |
+| Sistem durumu göstergesi (sidebar alt kısmı) | ÇALIŞIYOR | AI bağlantısı + hafıza durumu |
+| İlk açılışta hızlı başlangıç önerileri | ÇALIŞIYOR | 3 sabit öneri, tıklanınca gerçek mesaj olarak gönderilir |
 | Osman Profili (CRUD) | ÇALIŞIYOR | Tekil kayıt, sıfırlanabilir |
 | Proje hafızası (CRUD) | ÇALIŞIYOR | Liste, aktif proje seçimi |
 | Project Analyzer alanları | ÇALIŞIYOR | Proje kaydına eklenmiş 5 alan, ayrı sistem değil |

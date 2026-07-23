@@ -7,7 +7,7 @@ app/
   layout.js                   Kök HTML iskeleti, meta/viewport
   page.js                     Ana ekran — tüm katmanları yükler, panelleri yönlendirir
   error.js                    Genel hata sınırı — beklenmeyen render hatalarında güvenli kurtarma ekranı
-  globals.css                 Tüm stiller (koyu tema, panel/kart/form/nav/dashboard)
+  globals.css                 Tüm stiller — CSS değişkenleriyle tek tasarım sistemi (sidebar/topbar, sohbet, panel/kart/form/dashboard, responsive)
   api/chat/
     route.js                 Tek sunucu endpoint'i — oran sınırlama + GROQ'a streaming istek
     rateLimit.js              IP başına in-memory oran sınırlama (ücretsiz GROQ kotasını korur)
@@ -15,7 +15,7 @@ app/
     core/
       personality.js          Sabit kimlik + ses tonu
       brain.js                 Sabit karar/cevap/proje/güvenlik/sanat/girişimcilik kuralları
-      index.js                 SYSTEM_PROMPT, APP_VERSION, BUILD_INFO, WELCOME_MESSAGE
+      index.js                 SYSTEM_PROMPT, APP_VERSION, BUILD_INFO, WELCOME_MESSAGE, QUICK_START_PROMPTS
     data/
       storage.js               localStorage oku/yaz/sil + newId() + today() + isStorageAvailable() + son hata takibi
       schema.js                 Tek kaynaklı şema sürümü + göç (migration) + yedekten geri yükleme
@@ -37,9 +37,8 @@ app/
     context.js                 Değişken veriyi, sınırlandırılmış (son N kayıt + karakter tavanı) bağlam metnine çevirir
     dataManagement.js          Dışa aktar / doğrulamalı içe aktar / temizle
   components/
-    Nav.js                     12 sekmelik gezinme
-    StatusBar.js                Üst durum noktaları (AI/hafıza)
-    ChatPanel.js                 Sohbet arayüzü, streaming okuma, dışa aktar
+    Sidebar.js                   Sol sidebar gezinmesi (masaüstü sabit, mobil/tablette açılır/kapanır) + aktif proje seçici + AI/hafıza durum noktaları
+    ChatPanel.js                 Sohbet arayüzü (karşılama + hızlı başlangıç önerileri, streaming okuma, dışa aktar)
     SingleRecordPanel.js         Tekil kayıt formu (Profil/Security/Payment ortak bileşeni)
     RecordListPanel.js           Liste CRUD formu (Projeler/Görevler/Kararlar/Hafıza/... ortak bileşeni)
     DashboardCards.js             Özet ekranı kartları
@@ -57,7 +56,7 @@ CLAUDE.md, CONTRIBUTING.md, README.md, .env.example, package.json, next.config.j
 
 Talep edilen 14 katmanın bu koddaki gerçek karşılıkları:
 
-1. **UI Layer** → `app/page.js` (orkestratör) + `app/components/*`
+1. **UI Layer** → `app/page.js` (orkestratör) + `app/components/*` (sidebar tabanlı tek tasarım sistemi)
 2. **Chat Layer** → `app/components/ChatPanel.js` + `app/api/chat/route.js`
 3. **Core Brain** → `app/lib/core/*`
 4. **Context Builder** → `app/lib/context.js`
@@ -93,7 +92,7 @@ Yeni bir liste veya tekil veri türü gerektiğinde **yeni bir CRUD yazılmaz**,
 
 ## İstek akışı (bir sohbet mesajı gönderildiğinde)
 
-1. `page.js` state'inde tutulan profile/activeProject/projectDecisions/projectTasks/protocolsSummary/futureProblemsSummary `ChatPanel`'e `contextData` olarak geçilir.
+1. `page.js` state'inde tutulan profile/activeProject/**allProjects** (tüm projelerin isim+durumu, bağlam sınırı içinde)/projectDecisions/projectTasks/protocolsSummary/futureProblemsSummary `ChatPanel`'e `contextData` olarak geçilir.
 2. `ChatPanel`, `/api/chat`'e `POST { messages, context: contextData }` gönderir.
 3. `route.js`, `buildDynamicContext(context)` ile bir metin üretir, `SYSTEM_PROMPT`'un altına ekler.
 4. GROQ'a `stream: true` ile istek atılır.
