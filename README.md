@@ -1,28 +1,19 @@
-# OSMAN AI — V2–V5
+# OSMAN AI
 
-Osman'ın dijital ikizi: kişisel yapay zekâsı, proje yöneticisi, fikir ortağı, araştırma asistanı ve iş geliştirme ortağı. Çalışan V1 sohbet çekirdeğinin üzerine katman katman eklendi; hiçbiri çalışan sohbeti/GROQ bağlantısını bozmadı.
+Osman'ın kişisel dijital ikizi: proje yöneticisi, fikir ortağı, araştırma asistanı ve teknoloji/sanat danışmanı. Next.js üzerinde çalışır, ücretsiz GROQ API'sinden gerçek AI cevapları üretir.
 
-## Kullanılan teknolojiler
+## Mevcut durum
 
-- Next.js (web arayüzü, streaming API route)
-- Vercel (ücretsiz barındırma)
-- GROQ API (ücretsiz, kredi kartı istemeyen AI servisi, model: `llama-3.3-70b-versatile`)
+Sohbet, Osman Profili, Kişisel Hafıza, Proje/Görev/Karar sistemi, Gelecek Problemleri Araştırması, AI Security Protocol, AI Payment Protocol, Dashboard (Özet), Sistem Durumu ve Veri Yönetimi katmanları çalışıyor. Ayrıntılı durum tablosu ve neyin planlanıp neyin henüz kurulmadığı için: **[docs/00-MASTER-SPEC.md](docs/00-MASTER-SPEC.md)**.
 
-## 1. GROQ API anahtarı alma (ücretsiz)
-
-1. https://console.groq.com adresine git ve ücretsiz hesap aç.
-2. Sol menüden **API Keys** bölümüne gir.
-3. **Create API Key** butonuna bas, anahtarı kopyala.
-4. Kredi kartı istenmez. Günlük 14.400 istek, dakikada 30 istek ücretsiz kotadır.
-
-## 2. Yerelde çalıştırma
+## Çalıştırma
 
 ```bash
 npm install
 cp .env.example .env.local
 ```
 
-`.env.local` dosyasını aç, şu satırı doldur:
+`.env.local` içine GROQ anahtarını yaz:
 
 ```
 GROQ_API_KEY=BURAYA_ANAHTARI_YAPISTIR
@@ -34,70 +25,29 @@ Sonra:
 npm run dev
 ```
 
-Tarayıcıda `http://localhost:3000` adresini aç.
+`http://localhost:3000` adresini aç.
 
-## 3. Vercel'e deploy etme
+## Environment Variable
 
-1. https://vercel.com adresinde ücretsiz hesabınla giriş yap.
-2. **Add New → Project** ile bu GitHub reposunu (`fireworkfire07-sketch/osman-ai`) seç.
-3. **Environment Variables** bölümüne git, şunu ekle:
-   - Key: `GROQ_API_KEY`
-   - Value: GROQ'dan aldığın anahtar
-4. **Deploy** butonuna bas.
+| Değişken | Zorunlu | Açıklama |
+|---|---|---|
+| `GROQ_API_KEY` | Evet | [console.groq.com](https://console.groq.com) üzerinden ücretsiz, kredi kartsız alınır |
+| `GROQ_MODEL` | Hayır | Varsayılan `llama-3.3-70b-versatile` |
 
-API anahtarı yalnızca Vercel'in sunucu tarafında tutulur, tarayıcı koduna hiçbir zaman yazılmaz.
+## Deployment
 
-## Mimari
+Production: `osman-ai.vercel.app` — Vercel projesi `osman-ai`, GitHub `main` dalına her push otomatik deploy tetikler. API anahtarı yalnızca Vercel Environment Variables'da tutulur, hiçbir zaman frontend koduna yazılmaz.
 
-```
-app/lib/core/       Değişmez çekirdek — Personality + Brain (kimlik, karar prensipleri,
-                     cevap kuralları, proje/para/sanat/girişimcilik/güvenlik yaklaşımı).
-                     Yalnızca kod değişikliğiyle değişir, hiçbir ekrandan düzenlenemez.
-app/lib/data/        Değişebilir veri. collection.js: liste tipi kayıtlar (projeler,
-                     kararlar, görevler, kişisel hafıza, gelecek problemleri, sürekli
-                     gelişim notları) için paylaşılan tek CRUD; singleRecord.js: tekil
-                     kayıtlar (profil, AI Security/Payment Protocol) için paylaşılan
-                     yükle/kaydet/sıfırla. options.js: paylaşılan öncelik seçenekleri.
-                     Hepsi tarayıcı localStorage'ında.
-app/lib/context.js   Değişken veriyi (profil + aktif proje + kararları + görevleri +
-                     protokol/gelecek özetini) sunucuya gönderilecek bağlam metnine çevirir.
-app/api/chat/route.js  Core + bağlamı birleştirir, GROQ'a stream:true ile gönderir,
-                     token'ları anlık olarak tarayıcıya akıtır.
-app/components/      RecordListPanel (liste CRUD) ve SingleRecordPanel (tekil kayıt)
-                     her veri türü için yeniden kullanılır; DashboardCards + TodayPanel
-                     Özet ekranını oluşturur.
-app/page.js          Tüm katmanları yükleyip birbirine bağlayan ana ekran.
-```
+## Dokümantasyon
 
-## Şu an çalışan özellikler
+Bu projenin tüm vizyonu, mimarisi, veri modeli, kuralları ve yol haritası `docs/` klasöründedir. Başlangıç noktası: **[docs/00-MASTER-SPEC.md](docs/00-MASTER-SPEC.md)**.
 
-- **Özet** (ana sayfa) — Dashboard kartları (Aktif Proje, Toplam Proje, Görev/Karar/Hafıza/Araştırma sayıları, AI Security, AI Payment) ve **Bugün** bölümü (son görev/karar/proje, aktif projenin sonraki adımı, açık araştırmalar)
-- Türkçe sohbet, GROQ'tan **canlı akan (streaming)** gerçek AI cevabı
-- Sohbet geçmişi cihazda kalıcı — sayfa yenilenince kaybolmaz; **Yeni Sohbet** ve **Konuşmayı Dışa Aktar** (.txt) butonları
-- Sistem durumu göstergesi + ayrıntılı **Sistem Durumu** paneli (AI bağlantısı, hafıza durumu, aktif proje, son hata, sürüm/build bilgisi)
-- **Osman Profili** — meslekler, yetenekler, ilgi alanları, sanatsal alanlar, çalışma tercihleri, hedefler; görüntülenebilir, düzenlenebilir, varsayılana sıfırlanabilir
-- **Proje hafızası** — amaç, durum, teknoloji, repo, çalışan/çalışmayan özellikler, hatalar, sonraki adım, öncelik, **Project Analyzer** (güçlü/zayıf yönler, riskler, teknik borç, sonraki öneri); tek bir **aktif proje** seçimi
-- **Görev sistemi** — projeye bağlı, durumu (Bekliyor/Yapılıyor/Tamamlandı/Hata oluştu) ve test yöntemi olan görevler
-- **Karar hafızası** — projeye bağlı, tarihli, durumlu kararlar
-- **Kişisel Hafıza** — kategori/başlık/içerik ile manuel not kaydı
-- **Gelecek Problemleri Araştırması** — başlık, problem, tahmini oluşma tarihi, etkilenen sektörler, mevcut çözümler, eksikler, Osman'ın çözüm fikri, ölçeklenebilirlik, risk, öncelik
-- **AI Security Protocol** — problem, risk, güvenlik seviyesi, çözüm, kaynak, son güncelleme, araştırma notları (tekil, silinemez stratejik proje)
-- **AI Payment Protocol** — senaryo, güven modeli, kimlik doğrulama, ödeme akışı, riskler, kullanıcı onayı, araştırma notları (tekil, silinemez stratejik proje)
-- **Sürekli Gelişim Notları** — eksik/sebep/önerilen geliştirme/öncelik/durum kaydı (yalnızca not; otomatik uygulanmaz)
-- **Veri Yönetimi** — tüm veriyi tek dosyada yedekle (indir), başka bir yedekten içe aktar, tüm veriyi temizle (hepsi onay ister)
-- Sohbet her mesajda Osman'ın profilini, aktif projesini, o projenin kararlarını/görevlerini ve stratejik projelerin özetini otomatik olarak AI'a bağlam olarak verir
-- İlk açılışta (sohbet geçmişi boşken) Osman'ı tanıyan sabit bir karşılama mesajı gösterilir, sonraki mesajlarda tekrarlanmaz
+Geliştirme yapacaksan önce **[CLAUDE.md](CLAUDE.md)** ve **[CONTRIBUTING.md](CONTRIBUTING.md)** dosyalarını oku.
 
-## Hafıza nerede tutuluyor?
+## Güvenlik
 
-**Tarayıcının `localStorage`'ında — cihaz üzerinde, sunucuda değil.** Vercel'in sunucu fonksiyonları her istekte sıfırdan çalıştığı için (disk üzerinde kalıcı hafızası yoktur) tüm veri tarayıcıda saklanır ve sohbet isteğiyle birlikte sunucuya gönderilir.
+API anahtarları sunucu tarafında kalır, `.env` dosyaları GitHub'a yüklenmez. Ayrıntı: **[docs/18-SECURITY-AND-PRIVACY.md](docs/18-SECURITY-AND-PRIVACY.md)**.
 
-**Önemli sınır:** Bu veri yalnızca kullandığın cihaz/tarayıcıda kalır — telefon ile tablet arasında otomatik senkronize olmaz. Cihazlar arası taşımak istersen **Veri Yönetimi** panelinden yedek indirip diğer cihazda içe aktarabilirsin. Otomatik senkronizasyon istenirse bir sonraki aşamada ücretsiz bir veritabanı (ör. Supabase) eklenir.
+## Durum notu
 
-## Bilinçli olarak eklenmeyenler
-
-"Gelişim Motoru" ve "Gelecek Araştırma Motoru" gibi kendi kendine öneri üretip otomatik çalışan sistemler kurulmadı. Bunlar sürekli çalışan (zamanlanmış) arka plan görevleri gerektirir ve OSMAN AI'ın kendi kuralı da onay olmadan kritik değişiklik yapılmamasını şart koşar. Bunun yerine bu katman, Osman'ın manuel olarak dolduracağı bir "Sürekli Gelişim Notları" listesi olarak eklendi.
-
-## Bilinen eksik: otomatik lint/test yok
-
-Next.js 16, CLI'dan `next lint` komutunu kaldırdı ve bu projede ESLint/Jest/Playwright gibi bir test çerçevesi devDependency olarak eklenmedi. Her sprintte build + manuel Playwright kontrolü yapılıyor ama bu commit edilen, tekrar çalıştırılabilir bir test paketi değil. Kalıcı bir test çerçevesi eklemek istersen bu ayrı bir mimari karar olarak ele alınmalı.
+Bu, tek kullanıcılı (Osman), kişisel kullanım için geliştirilen bir projedir. Aylık zorunlu maliyet hedefi 0 TL'dir (GROQ ücretsiz kota + Vercel ücretsiz plan + localStorage).
