@@ -1,0 +1,152 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #121212;
+  color: #f0f0f0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#osman-app {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.osman-header {
+  padding: 16px;
+  text-align: center;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.osman-header h1 {
+  margin: 0;
+  font-size: 24px;
+  letter-spacing: 1px;
+}
+
+.osman-header p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #9a9a9a;
+}
+
+.osman-status {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 16px;
+  font-size: 12px;
+  border-bottom: 1px solid #2a2a2a;
+  flex-wrap: wrap;
+}
+
+.osman-status span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #666;
+}
+
+.dot.ok {
+  background: #3ddc84;
+}
+
+.dot.fail {
+  background: #ff5c5c;
+}
+
+.osman-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.msg {
+  max-width: 85%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.msg.user {
+  align-self: flex-end;
+  background: #2f6feb;
+  color: white;
+}
+
+.msg.assistant {
+  align-self: flex-start;
+  background: #1e1e1e;
+  border: 1px solid #2a2a2a;
+}
+
+.msg.error {
+  align-self: center;
+  background: #3a1f1f;
+  border: 1px solid #ff5c5c;
+  color: #ffb3b3;
+  max-width: 100%;
+  text-align: center;
+}
+
+.osman-form {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid #2a2a2a;
+}
+
+.osman-form textarea {
+  flex: 1;
+  resize: none;
+  border-radius: 12px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #f0f0f0;
+  padding: 12px 14px;
+  font-size: 16px;
+  min-height: 48px;
+  max-height: 140px;
+}
+
+.osman-form button {
+  border: none;
+  border-radius: 12px;
+  background: #2f6feb;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  padding: 0 20px;
+  min-height: 48px;
+  cursor: pointer;
+}
+
+.osman-form button:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .osman-header h1 {
+    font-size: 20px;
+  }
+}
