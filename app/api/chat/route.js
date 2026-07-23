@@ -1,10 +1,7 @@
+import { OSMAN_SYSTEM_PROMPT, buildMemoryContext } from "../../lib/osman";
+
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-
-const SYSTEM_PROMPT =
-  "Sen OSMAN AI'sın. Osman'ın kişisel dijital çalışma asistanısın. " +
-  "Türkçe, açık, doğrudan ve uygulanabilir cevaplar verirsin. Gereksiz uzun açıklamalar yapmazsın. " +
-  "Bilmediğin bir şeyi biliyormuş gibi davranmazsın.";
 
 export async function GET() {
   return Response.json({ groqKeyPresent: Boolean(process.env.GROQ_API_KEY) });
@@ -27,8 +24,14 @@ export async function POST(request) {
   }
 
   const history = Array.isArray(body?.messages) ? body.messages : [];
+  const memoryContext = buildMemoryContext(body?.context || {});
+
+  const systemContent = memoryContext
+    ? `${OSMAN_SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${memoryContext}`
+    : OSMAN_SYSTEM_PROMPT;
+
   const chatMessages = [
-    { role: "system", content: SYSTEM_PROMPT },
+    { role: "system", content: systemContent },
     ...history
       .filter((m) => m.role === "user" || m.role === "assistant")
       .map((m) => ({ role: m.role, content: String(m.content || "") })),
