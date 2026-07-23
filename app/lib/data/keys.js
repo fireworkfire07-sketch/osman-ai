@@ -6,7 +6,8 @@ export const STORAGE_KEYS = {
   decisions: "osman-ai:decisions",
   tasks: "osman-ai:tasks",
   futureProblems: "osman-ai:future-problems",
-  protocols: "osman-ai:protocols",
+  securityProtocol: "osman-ai:security-protocol",
+  paymentProtocol: "osman-ai:payment-protocol",
   improvements: "osman-ai:improvements",
   activeProjectId: "osman-ai:active-project-id",
 };

@@ -1,6 +1,7 @@
 "use client";
 
 const ITEMS = [
+  { key: "ozet", label: "Özet" },
   { key: "chat", label: "Sohbet" },
   { key: "profil", label: "Profil" },
   { key: "projeler", label: "Projeler" },
@@ -8,7 +9,8 @@ const ITEMS = [
   { key: "kararlar", label: "Kararlar" },
   { key: "hafiza", label: "Hafıza" },
   { key: "gelecek", label: "Gelecek Problemleri" },
-  { key: "protokoller", label: "AI Security / Payment Protocol" },
+  { key: "security", label: "AI Security Protocol" },
+  { key: "payment", label: "AI Payment Protocol" },
   { key: "sistem", label: "Sistem Durumu" },
   { key: "veri", label: "Veri Yönetimi" },
 ];

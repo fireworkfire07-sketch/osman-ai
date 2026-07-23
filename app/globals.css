@@ -358,6 +358,33 @@ body {
   color: #8a8a8a;
 }
 
+.osman-dash-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  padding: 16px;
+}
+
+.osman-dash-card {
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  padding: 12px;
+  background: #1a1a1a;
+  text-align: center;
+}
+
+.osman-dash-value {
+  font-size: 18px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.osman-dash-label {
+  font-size: 11px;
+  color: #9a9a9a;
+  margin-top: 4px;
+}
+
 @media (max-width: 480px) {
   .osman-header h1 {
     font-size: 20px;
@@ -366,5 +393,9 @@ body {
   .osman-nav button {
     min-width: 80px;
     font-size: 12px;
+  }
+
+  .osman-dash-grid {
+    grid-template-columns: repeat(2, 1fr);
   }
 }

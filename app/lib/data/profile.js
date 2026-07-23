@@ -1,4 +1,4 @@
-import { readJSON, writeJSON } from "./storage";
+import { createSingleRecord } from "./singleRecord";
 import { STORAGE_KEYS } from "./keys";
 
 export function createDefaultProfile() {
@@ -21,36 +21,20 @@ export function createDefaultProfile() {
   };
 }
 
-export function loadProfile() {
-  const existing = readJSON(STORAGE_KEYS.profile, null);
-  if (existing) return existing;
-  const created = createDefaultProfile();
-  writeJSON(STORAGE_KEYS.profile, created);
-  return created;
-}
-
-export function saveProfile(profile) {
-  writeJSON(STORAGE_KEYS.profile, profile);
-}
-
-export function resetProfile() {
-  const created = createDefaultProfile();
-  writeJSON(STORAGE_KEYS.profile, created);
-  return created;
-}
+export const profileRecord = createSingleRecord(STORAGE_KEYS.profile, createDefaultProfile);
 
 export const PROFILE_FIELDS = [
-  { key: "isim", label: "İsim" },
-  { key: "meslekler", label: "Meslekler" },
-  { key: "yetenekler", label: "Yetenekler" },
-  { key: "ilgiAlanlari", label: "İlgi alanları" },
-  { key: "sanatsalAlanlar", label: "Sanatsal alanlar" },
-  { key: "teknikSeviye", label: "Teknik seviye" },
-  { key: "kullanilanCihazlar", label: "Kullanılan cihazlar" },
-  { key: "calismaTercihleri", label: "Çalışma tercihleri" },
-  { key: "isHedefleri", label: "İş hedefleri" },
-  { key: "uzunVadeliHedefler", label: "Uzun vadeli hedefler" },
-  { key: "iletisimTercihleri", label: "İletişim tercihleri" },
-  { key: "aktifSektorler", label: "Aktif sektörler" },
-  { key: "kisiselDegerler", label: "Kişisel değerler" },
+  { key: "isim", label: "İsim", type: "text" },
+  { key: "meslekler", label: "Meslekler", type: "textarea" },
+  { key: "yetenekler", label: "Yetenekler", type: "textarea" },
+  { key: "ilgiAlanlari", label: "İlgi alanları", type: "textarea" },
+  { key: "sanatsalAlanlar", label: "Sanatsal alanlar", type: "textarea" },
+  { key: "teknikSeviye", label: "Teknik seviye", type: "textarea" },
+  { key: "kullanilanCihazlar", label: "Kullanılan cihazlar", type: "textarea" },
+  { key: "calismaTercihleri", label: "Çalışma tercihleri", type: "textarea" },
+  { key: "isHedefleri", label: "İş hedefleri", type: "textarea" },
+  { key: "uzunVadeliHedefler", label: "Uzun vadeli hedefler", type: "textarea" },
+  { key: "iletisimTercihleri", label: "İletişim tercihleri", type: "textarea" },
+  { key: "aktifSektorler", label: "Aktif sektörler", type: "textarea" },
+  { key: "kisiselDegerler", label: "Kişisel değerler", type: "textarea" },
 ];

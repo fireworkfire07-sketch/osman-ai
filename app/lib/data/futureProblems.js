@@ -1,21 +1,22 @@
 import { createCollection } from "./collection";
 import { STORAGE_KEYS } from "./keys";
+import { PRIORITY_OPTIONS } from "./options";
 
 function seed() {
   return [
     {
       id: "future-problems-research",
-      problemAdi: "Gelecek Problemleri Araştırması (genel takip)",
+      baslik: "Gelecek Problemleri Araştırması (genel takip)",
+      problem: "Bugün çözülemeyen veya henüz fark edilmemiş problemleri erken tespit etmek",
       neZamanOrtayaCikabilir: "Sürekli / uzun vadeli",
       kimleriEtkiler:
         "Yapay zekâ, dijital kimlik, siber güvenlik, finans, AI ajanları, robotik, sağlık, enerji, eğitim ve sanat teknolojileri alanlarında çalışan herkes",
       mevcutCozumler: "Henüz araştırılmadı",
       eksikKalanNokta: "Henüz belirlenmedi",
       potansiyelCozum: "",
-      isModeli: "",
-      teknikRisk: "",
-      hukukiRisk: "",
       kureselBuyumePotansiyeli: "Belirlenecek",
+      risk: "",
+      oncelik: "Orta",
       durum: "Takip ediliyor",
     },
   ];
@@ -30,15 +31,15 @@ export const FUTURE_PROBLEM_STATUS_OPTIONS = [
 ];
 
 export const FUTURE_PROBLEM_FIELDS = [
-  { key: "problemAdi", label: "Problem adı", type: "text" },
-  { key: "neZamanOrtayaCikabilir", label: "Ne zaman ortaya çıkabilir", type: "text" },
-  { key: "kimleriEtkiler", label: "Kimleri etkiler", type: "textarea" },
+  { key: "baslik", label: "Başlık", type: "text" },
+  { key: "problem", label: "Problem", type: "textarea" },
+  { key: "neZamanOrtayaCikabilir", label: "Tahmini oluşma tarihi", type: "text" },
+  { key: "kimleriEtkiler", label: "Etkilenen sektörler", type: "textarea" },
   { key: "mevcutCozumler", label: "Mevcut çözümler", type: "textarea" },
-  { key: "eksikKalanNokta", label: "Eksik kalan nokta", type: "textarea" },
-  { key: "potansiyelCozum", label: "Potansiyel çözüm", type: "textarea" },
-  { key: "isModeli", label: "İş modeli", type: "textarea" },
-  { key: "teknikRisk", label: "Teknik risk", type: "textarea" },
-  { key: "hukukiRisk", label: "Hukuki risk", type: "textarea" },
-  { key: "kureselBuyumePotansiyeli", label: "Küresel büyüme potansiyeli", type: "text" },
+  { key: "eksikKalanNokta", label: "Eksikler", type: "textarea" },
+  { key: "potansiyelCozum", label: "Osman'ın çözüm fikri", type: "textarea" },
+  { key: "kureselBuyumePotansiyeli", label: "Ölçeklenebilirlik", type: "text" },
+  { key: "risk", label: "Risk", type: "textarea" },
+  { key: "oncelik", label: "Öncelik", type: "select", options: PRIORITY_OPTIONS },
   { key: "durum", label: "Durum", type: "select", options: FUTURE_PROBLEM_STATUS_OPTIONS },
 ];

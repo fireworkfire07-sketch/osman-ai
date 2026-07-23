@@ -5,28 +5,33 @@ import { useEffect, useMemo, useState } from "react";
 import Nav from "./components/Nav";
 import StatusBar from "./components/StatusBar";
 import ChatPanel from "./components/ChatPanel";
-import ProfilePanel from "./components/ProfilePanel";
+import SingleRecordPanel from "./components/SingleRecordPanel";
 import RecordListPanel from "./components/RecordListPanel";
 import SystemHealthPanel from "./components/SystemHealthPanel";
 import DataManagementPanel from "./components/DataManagementPanel";
+import DashboardCards from "./components/DashboardCards";
+import TodayPanel from "./components/TodayPanel";
 
-import { loadProfile, saveProfile, resetProfile } from "./lib/data/profile";
-import { projectsCollection, PROJECT_FIELDS } from "./lib/data/projects";
+import { profileRecord, PROFILE_FIELDS } from "./lib/data/profile";
+import { projectsCollection, PROJECT_FIELDS, PROJECT_ANALYZER_FIELDS } from "./lib/data/projects";
 import { decisionsCollection, decisionFields } from "./lib/data/decisions";
 import { tasksCollection, taskFields } from "./lib/data/tasks";
 import { personalMemoryCollection, PERSONAL_MEMORY_FIELDS } from "./lib/data/personalMemory";
 import { futureProblemsCollection, FUTURE_PROBLEM_FIELDS } from "./lib/data/futureProblems";
-import { protocolsCollection, PROTOCOL_FIELDS } from "./lib/data/protocols";
+import { securityProtocolRecord, SECURITY_PROTOCOL_FIELDS } from "./lib/data/securityProtocol";
+import { paymentProtocolRecord, PAYMENT_PROTOCOL_FIELDS } from "./lib/data/paymentProtocol";
 import { improvementsCollection, IMPROVEMENT_FIELDS } from "./lib/data/improvements";
 import { loadActiveProjectId, saveActiveProjectId } from "./lib/data/activeProject";
 import { isStorageAvailable } from "./lib/data/storage";
+
+const PROJECT_ALL_FIELDS = [...PROJECT_FIELDS, ...PROJECT_ANALYZER_FIELDS];
 
 export default function Home() {
   const [ready, setReady] = useState(false);
   const [memoryOk, setMemoryOk] = useState(true);
   const [aiOk, setAiOk] = useState(null);
   const [lastError, setLastError] = useState("");
-  const [panel, setPanel] = useState("chat");
+  const [panel, setPanel] = useState("ozet");
 
   const [profile, setProfile] = useState(null);
   const [projects, setProjects] = useState([]);
@@ -34,7 +39,8 @@ export default function Home() {
   const [tasks, setTasks] = useState([]);
   const [personalMemory, setPersonalMemory] = useState([]);
   const [futureProblems, setFutureProblems] = useState([]);
-  const [protocols, setProtocols] = useState([]);
+  const [securityProtocol, setSecurityProtocol] = useState(null);
+  const [paymentProtocol, setPaymentProtocol] = useState(null);
   const [improvements, setImprovements] = useState([]);
   const [activeProjectId, setActiveProjectId] = useState(null);
 
@@ -60,13 +66,14 @@ export default function Home() {
       if (activeId) saveActiveProjectId(activeId);
     }
 
-    setProfile(loadProfile());
+    setProfile(profileRecord.load());
     setProjects(loadedProjects);
     setDecisions(decisionsCollection.load());
     setTasks(tasksCollection.load());
     setPersonalMemory(personalMemoryCollection.load());
     setFutureProblems(futureProblemsCollection.load());
-    setProtocols(protocolsCollection.load());
+    setSecurityProtocol(securityProtocolRecord.load());
+    setPaymentProtocol(paymentProtocolRecord.load());
     setImprovements(improvementsCollection.load());
     setActiveProjectId(activeId);
     setReady(true);
@@ -79,9 +86,12 @@ export default function Home() {
   const projectTasks = tasks.filter((t) => t.projeId === activeProjectId);
 
   const protocolsSummary = useMemo(() => {
-    if (!protocols.length) return "";
-    return "Stratejik araştırma projeleri: " + protocols.map((p) => `${p.ad} (${p.durum})`).join(", ");
-  }, [protocols]);
+    if (!securityProtocol && !paymentProtocol) return "";
+    const parts = [];
+    if (securityProtocol) parts.push(`AI Security Protocol (güvenlik seviyesi: ${securityProtocol.guvenlikSeviyesi})`);
+    if (paymentProtocol) parts.push(`AI Payment Protocol (güven modeli: ${paymentProtocol.guvenModeli})`);
+    return "Stratejik araştırma projeleri: " + parts.join(", ");
+  }, [securityProtocol, paymentProtocol]);
 
   const futureProblemsSummary = useMemo(() => {
     if (!futureProblems.length) return "";
@@ -97,6 +107,8 @@ export default function Home() {
     protocolsSummary,
     futureProblemsSummary,
   };
+
+  const openResearch = futureProblems.filter((f) => f.durum !== "Vazgeçildi");
 
   function selectActiveProject(id) {
     setActiveProjectId(id);
@@ -134,27 +146,52 @@ export default function Home() {
         </div>
       )}
 
+      {panel === "ozet" && (
+        <>
+          <DashboardCards
+            activeProject={activeProject}
+            totalProjects={projects.length}
+            totalTasks={tasks.length}
+            totalDecisions={decisions.length}
+            totalMemory={personalMemory.length}
+            totalResearch={futureProblems.length}
+            securityStatus={securityProtocol?.guvenlikSeviyesi}
+            paymentStatus={paymentProtocol?.guvenModeli}
+          />
+          <TodayPanel
+            lastTask={tasks[tasks.length - 1]}
+            lastDecision={decisions[decisions.length - 1]}
+            lastProject={projects[projects.length - 1]}
+            activeProject={activeProject}
+            openResearch={openResearch}
+          />
+        </>
+      )}
+
       {panel === "chat" && <ChatPanel contextData={contextData} onError={setLastError} />}
 
       {panel === "profil" && profile && (
-        <ProfilePanel
-          profile={profile}
+        <SingleRecordPanel
+          title="Osman Profili"
+          fields={PROFILE_FIELDS}
+          record={profile}
           onSave={(next) => {
             setProfile(next);
-            saveProfile(next);
+            profileRecord.save(next);
           }}
           onReset={() => {
-            const next = resetProfile();
+            const next = profileRecord.reset();
             setProfile(next);
             return next;
           }}
+          resetConfirmText="Profili varsayılana sıfırlamak istediğine emin misin?"
         />
       )}
 
       {panel === "projeler" && (
         <RecordListPanel
           title="Projeler"
-          fields={PROJECT_FIELDS}
+          fields={PROJECT_ALL_FIELDS}
           records={projects}
           onAdd={(values) => setProjects(projectsCollection.add(projects, values))}
           onUpdate={(id, values) => setProjects(projectsCollection.update(projects, id, values))}
@@ -218,15 +255,27 @@ export default function Home() {
         />
       )}
 
-      {panel === "protokoller" && (
-        <RecordListPanel
-          title="AI Security Protocol / AI Payment Protocol"
-          fields={PROTOCOL_FIELDS}
-          records={protocols}
-          protectedIds={protocolsCollection.protectedIds}
-          onAdd={(values) => setProtocols(protocolsCollection.add(protocols, values))}
-          onUpdate={(id, values) => setProtocols(protocolsCollection.update(protocols, id, values))}
-          onDelete={(id) => setProtocols(protocolsCollection.remove(protocols, id))}
+      {panel === "security" && securityProtocol && (
+        <SingleRecordPanel
+          title="AI Security Protocol"
+          fields={SECURITY_PROTOCOL_FIELDS}
+          record={securityProtocol}
+          onSave={(next) => {
+            setSecurityProtocol(next);
+            securityProtocolRecord.save(next);
+          }}
+        />
+      )}
+
+      {panel === "payment" && paymentProtocol && (
+        <SingleRecordPanel
+          title="AI Payment Protocol"
+          fields={PAYMENT_PROTOCOL_FIELDS}
+          record={paymentProtocol}
+          onSave={(next) => {
+            setPaymentProtocol(next);
+            paymentProtocolRecord.save(next);
+          }}
         />
       )}
 

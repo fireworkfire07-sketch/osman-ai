@@ -1,6 +1,7 @@
 import { createCollection } from "./collection";
 import { STORAGE_KEYS } from "./keys";
 import { today } from "./storage";
+import { PRIORITY_OPTIONS } from "./options";
 
 function seed() {
   const day = today();
@@ -21,6 +22,15 @@ function seed() {
       calismayanOzellikler: "Cihazlar arası senkron yok",
       hatalar: "",
       sonrakiAdim: "Vercel'e deploy edip GROQ_API_KEY environment variable'ını eklemek",
+      gucluYonler:
+        "Ücretsiz çalışıyor (GROQ + Vercel), tek repo içinde katmanlı ve tekrarsız mimari (paylaşılan CRUD fabrikası, tek sistem promptu), API anahtarı hiç frontend'e çıkmıyor",
+      zayifYonler:
+        "Hafıza yalnızca tek cihazda (localStorage) tutuluyor, cihazlar arası senkron yok; otomatik test paketi repoya commit edilmedi",
+      riskler:
+        "GROQ ücretsiz kotası aşılırsa sohbet geçici olarak çalışmaz; gerçek kullanıcı verisiyle henüz uzun süreli test edilmedi",
+      teknikBorc: "Playwright gibi bir test çerçevesi repoya eklenmedi, testler her sprintte elle çalıştırılıyor",
+      sonrakiOneri:
+        "Cihazlar arası senkron gerekiyorsa ücretsiz bir veritabanı (Supabase) değerlendirilmeli; otomatik test paketi eklenmesi düşünülmeli",
       createdAt: day,
       updatedAt: day,
     },
@@ -34,16 +44,7 @@ export const PROJECT_FIELDS = [
   { key: "amac", label: "Amaç", type: "textarea" },
   { key: "aciklama", label: "Açıklama", type: "textarea" },
   { key: "durum", label: "Mevcut durum", type: "text" },
-  {
-    key: "oncelik",
-    label: "Öncelik",
-    type: "select",
-    options: [
-      { value: "Yüksek", label: "Yüksek" },
-      { value: "Orta", label: "Orta" },
-      { value: "Düşük", label: "Düşük" },
-    ],
-  },
+  { key: "oncelik", label: "Öncelik", type: "select", options: PRIORITY_OPTIONS },
   { key: "teknoloji", label: "Kullanılan teknoloji", type: "text" },
   { key: "repo", label: "GitHub reposu", type: "text" },
   { key: "vercelProjesi", label: "Vercel projesi", type: "text" },
@@ -52,4 +53,14 @@ export const PROJECT_FIELDS = [
   { key: "calismayanOzellikler", label: "Çalışmayan özellikler", type: "textarea" },
   { key: "hatalar", label: "Karşılaşılan hatalar", type: "textarea" },
   { key: "sonrakiAdim", label: "Sonraki adım", type: "textarea" },
+];
+
+// Project Analyzer (V4): her proje için ayrı bir analiz sistemi kurmak yerine
+// aynı proje kaydına eklenen dört alan — mevcut CRUD'u genişletir, kopyalamaz.
+export const PROJECT_ANALYZER_FIELDS = [
+  { key: "gucluYonler", label: "Güçlü yönler", type: "textarea" },
+  { key: "zayifYonler", label: "Zayıf yönler", type: "textarea" },
+  { key: "riskler", label: "Riskler", type: "textarea" },
+  { key: "teknikBorc", label: "Teknik borç", type: "textarea" },
+  { key: "sonrakiOneri", label: "Sonraki öneri", type: "textarea" },
 ];
