@@ -73,6 +73,24 @@ async function readStreamToString(stream) {
   return text;
 }
 
+// Tarayıcıdan gelen mesajları Groq'un beklediği şekle çevirir. Normal
+// user/assistant mesajlarının yanı sıra araç çağırma döngüsünün ürettiği
+// assistant(tool_calls) ve tool mesajlarını da olduğu gibi geçirir —
+// bunlar olmadan Groq çok turlu araç çağırmayı takip edemez.
+function toGroqMessage(m) {
+  if (!m || typeof m !== "object") return null;
+  if (m.role === "tool") {
+    return { role: "tool", tool_call_id: m.tool_call_id, content: String(m.content ?? "") };
+  }
+  if (m.role === "assistant" && Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+    return { role: "assistant", content: m.content ?? null, tool_calls: m.tool_calls };
+  }
+  if (m.role === "user" || m.role === "assistant") {
+    return { role: m.role, content: String(m.content || "") };
+  }
+  return null;
+}
+
 export async function POST(request) {
   // Oran sınırlaması, GROQ anahtarının varlığından bile önce kontrol edilir:
   // amaç yalnızca gerçek GROQ isteklerini değil, bu endpoint'e yapılan her
@@ -104,6 +122,7 @@ export async function POST(request) {
   }
 
   const history = Array.isArray(body?.messages) ? body.messages : [];
+  const araclar = Array.isArray(body?.araclar) && body.araclar.length > 0 ? body.araclar : null;
   const dynamicContext = buildDynamicContext(body?.context || {});
   const lastUserMessage = [...history].reverse().find((m) => m.role === "user")?.content || "";
 
@@ -141,12 +160,74 @@ export async function POST(request) {
       ? `${SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}`
       : SYSTEM_PROMPT) + repositoryBlock;
 
-  const chatMessages = [
-    { role: "system", content: systemContent },
-    ...history
-      .filter((m) => m.role === "user" || m.role === "assistant")
-      .map((m) => ({ role: m.role, content: String(m.content || "") })),
-  ];
+  const chatMessages = [{ role: "system", content: systemContent }, ...history.map(toGroqMessage).filter(Boolean)];
+
+  // Araç çağırma turu (A2, yapım emri Bölüm 2a): route.js ince proxy olarak
+  // kalır — Groq'a "tools" iletir, ham cevabı (tool_calls dahil) aynen
+  // döndürür. Hiçbir aracı burada ÇALIŞTIRMAZ; döngü tarayıcıda kurulu.
+  // Repository kanıt doğrulaması (halüsinasyon kilidi) burada da uygulanır,
+  // çünkü ChatPanel artık her mesajda "araclar" gönderiyor ve akan
+  // (streaming) yol aşağıda repository istekleri için artık kullanılmıyor.
+  if (araclar) {
+    let toolGroqRes;
+    try {
+      toolGroqRes = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          temperature: 0.6,
+          stream: false,
+          messages: chatMessages,
+          tools: araclar,
+          tool_choice: "auto",
+        }),
+      });
+    } catch (err) {
+      console.error("GROQ_REQUEST_FAILED", err);
+      return Response.json(
+        { error: "AI servisine bağlanılamadı. İnternet bağlantını ve GROQ anahtarını kontrol et." },
+        { status: 502 }
+      );
+    }
+
+    if (!toolGroqRes.ok) {
+      const detail = await toolGroqRes.text();
+      console.error("GROQ_API_ERROR", toolGroqRes.status, detail);
+      return Response.json(
+        { error: "AI servisinden cevap alınamadı. Lütfen birazdan tekrar dene." },
+        { status: 502 }
+      );
+    }
+
+    const data = await toolGroqRes.json();
+    const mesaj = data?.choices?.[0]?.message;
+
+    if (repoRequested && mesaj && typeof mesaj.content === "string" && mesaj.content) {
+      if (repoAccessFailed) {
+        const claims = extractClaimedPaths(mesaj.content);
+        if (claims.length > 0) mesaj.content = REPOSITORY_ACCESS_FAILED_MESSAGE;
+      } else if (repoEvidence) {
+        const claims = extractClaimedPaths(mesaj.content);
+        const { invalid: invalidPaths } = validateClaimedPaths(claims, repoEvidence.tree);
+        const invalidLines = validateLineRanges(claims, repoEvidence.sources);
+
+        if (invalidPaths.length > 0 || invalidLines.length > 0) {
+          mesaj.content = REPOSITORY_UNVERIFIED_CLAIM_MESSAGE;
+        } else if (repoEvidence.sources.length > 0) {
+          const sourceLines = repoEvidence.sources.map((s) => `- ${s.path}:${s.lines}`).join("\n");
+          mesaj.content += `\n\nKullanılan kaynaklar:\n${sourceLines}${
+            repoEvidence.commitShortSha ? `\nCommit: ${repoEvidence.commitShortSha}` : ""
+          }`;
+        }
+      }
+    }
+
+    return Response.json(data);
+  }
 
   let groqRes;
   try {

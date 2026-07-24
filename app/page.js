@@ -145,6 +145,15 @@ export default function Home() {
     reportStorageErrorIfAny();
   }
 
+  // Sohbet sırasında araç çağırma (hafiza_ekle vb.) doğrudan localStorage'a
+  // yazar; bu, ilgili paneli sayfa yenilenmeden güncel tutar (bkz. agentTools.js).
+  function onChatDataChanged(kind) {
+    if (kind === "personalMemory") setPersonalMemory(runStorageAction(() => personalMemoryCollection.load()));
+    else if (kind === "decisions") setDecisions(runStorageAction(() => decisionsCollection.load()));
+    else if (kind === "tasks") setTasks(runStorageAction(() => tasksCollection.load()));
+    else if (kind === "projects") setProjects(runStorageAction(() => projectsCollection.load()));
+  }
+
   function startNewChat() {
     const existing = loadChatHistory();
     if (
@@ -180,7 +189,14 @@ export default function Home() {
         )}
 
         <div className="osman-content">
-          {panel === "chat" && <ChatPanel key={chatResetKey} contextData={contextData} onError={setLastError} />}
+          {panel === "chat" && (
+            <ChatPanel
+              key={chatResetKey}
+              contextData={contextData}
+              onError={setLastError}
+              onDataChanged={onChatDataChanged}
+            />
+          )}
 
           {panel !== "chat" && (
             <div className="osman-page">
