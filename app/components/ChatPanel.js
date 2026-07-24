@@ -5,8 +5,63 @@ import { clearChatHistory, loadChatHistory, saveChatHistory } from "../lib/data/
 import { getLastStorageError, clearLastStorageError } from "../lib/data/storage";
 import { downloadText } from "../lib/dataManagement";
 import { WELCOME_MESSAGE, QUICK_START_PROMPTS } from "../lib/core";
+import { ARACLAR, araciCalistir } from "../lib/tools/agentTools";
 
-export default function ChatPanel({ contextData, onError }) {
+const MAX_ARAC_TURU = 4;
+
+async function groqTuru(mesajlar, contextData) {
+  const cevap = await fetch("/api/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: mesajlar, context: contextData, araclar: ARACLAR }),
+  });
+
+  if (!cevap.ok) {
+    const hata = await cevap.json().catch(() => ({}));
+    throw new Error(hata.error || `Sunucu hatası (${cevap.status})`);
+  }
+  return await cevap.json();
+}
+
+// Bölüm 2a'daki döngü: tarayıcı Groq'a "araclar" ile birlikte gönderir, sunucu
+// hiçbir aracı çalıştırmadan ham cevabı döndürür; tool_calls varsa tarayıcı
+// kendi collection fonksiyonlarıyla (agentTools.js) çalıştırır ve role:"tool"
+// mesajı olarak ekleyip tekrar gönderir. En fazla MAX_ARAC_TURU tur.
+async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
+  let mesajlar = baslangicMesajlari.map((m) => ({ role: m.role, content: m.content }));
+  const yapilanKayitlar = [];
+
+  for (let tur = 0; tur < MAX_ARAC_TURU; tur++) {
+    const veri = await groqTuru(mesajlar, contextData);
+    const mesaj = veri?.choices?.[0]?.message;
+    if (!mesaj) throw new Error("AI'dan geçerli bir cevap alınamadı.");
+
+    if (!mesaj.tool_calls || mesaj.tool_calls.length === 0) {
+      return { metin: mesaj.content || "", kayitlar: yapilanKayitlar };
+    }
+
+    mesajlar.push(mesaj);
+
+    for (const cagri of mesaj.tool_calls) {
+      let sonuc;
+      try {
+        const girdi = JSON.parse(cagri.function.arguments);
+        sonuc = araciCalistir(cagri.function.name, girdi);
+        if (sonuc?.ok) {
+          yapilanKayitlar.push({ arac: cagri.function.name, baslik: girdi.baslik || girdi.proje || "" });
+          if (sonuc.refresh) onDataChanged?.(sonuc.refresh);
+        }
+      } catch (e) {
+        sonuc = { hata: e?.message || "araç çalıştırılamadı" };
+      }
+      mesajlar.push({ role: "tool", tool_call_id: cagri.id, content: JSON.stringify(sonuc) });
+    }
+  }
+
+  return { metin: "İşlem tamamlanamadı, çok fazla adım gerekti.", kayitlar: yapilanKayitlar };
+}
+
+export default function ChatPanel({ contextData, onError, onDataChanged }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,53 +98,17 @@ export default function ChatPanel({ contextData, onError }) {
     setLoading(true);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: nextMessages, context: contextData }),
-      });
+      const { metin, kayitlar } = await sohbetCalistir(nextMessages, contextData, onDataChanged);
 
-      if (!res.ok || !res.body) {
-        let errText = "Bilinmeyen bir hata oluştu.";
-        try {
-          const data = await res.json();
-          errText = data.error || errText;
-        } catch {
-          // yanıt JSON değilse varsayılan mesaj kalır
-        }
+      if (!metin.trim()) {
+        const errText = "AI boş cevap döndürdü. Lütfen tekrar dene.";
         setMessages((prev) => [...prev, { role: "error", content: errText }]);
         onError?.(errText);
-        return;
-      }
-
-      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let assistantText = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        assistantText += decoder.decode(value, { stream: true });
-        const snapshot = assistantText;
-        setMessages((prev) => {
-          const copy = [...prev];
-          copy[copy.length - 1] = { role: "assistant", content: snapshot };
-          return copy;
-        });
-      }
-
-      if (!assistantText.trim()) {
-        const errText = "AI boş cevap döndürdü. Lütfen tekrar dene.";
-        setMessages((prev) => {
-          const copy = [...prev];
-          copy[copy.length - 1] = { role: "error", content: errText };
-          return copy;
-        });
-        onError?.(errText);
+      } else {
+        setMessages((prev) => [...prev, { role: "assistant", content: metin, kayitlar }]);
       }
     } catch (err) {
-      const errText = "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.";
+      const errText = err?.message || "Sunucuya ulaşılamadı. İnternet bağlantını kontrol et.";
       setMessages((prev) => [...prev, { role: "error", content: errText }]);
       onError?.(errText);
     } finally {
@@ -146,23 +165,20 @@ export default function ChatPanel({ contextData, onError }) {
         </div>
       ) : (
         <div className="osman-messages" ref={listRef}>
-          {messages.map((m, i) => {
-            const isStreamingPlaceholder =
-              loading && i === messages.length - 1 && m.role === "assistant" && m.content === "";
-            return (
-              <div key={i} className={`msg ${m.role}`}>
-                {isStreamingPlaceholder ? (
-                  <span className="osman-typing">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                ) : (
-                  m.content
-                )}
-              </div>
-            );
-          })}
+          {messages.map((m, i) => (
+            <div key={i} className={`msg ${m.role}`}>
+              {m.content}
+            </div>
+          ))}
+          {loading && (
+            <div className="msg assistant">
+              <span className="osman-typing">
+                <span />
+                <span />
+                <span />
+              </span>
+            </div>
+          )}
         </div>
       )}
 
