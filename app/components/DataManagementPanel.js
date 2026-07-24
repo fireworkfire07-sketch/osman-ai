@@ -60,9 +60,9 @@ export default function DataManagementPanel({ onAfterImport, onAfterWipe }) {
         cihazı etkiler.
       </p>
       <div className="osman-panel-actions">
-        <button onClick={handleBackup}>Tüm Veriyi Yedekle (indir)</button>
+        <button onClick={handleBackup}>Tüm Veriyi Dışa Aktar</button>
         <button className="secondary" onClick={handleImportClick}>
-          İçe Aktar (yükle)
+          Veriyi İçe Aktar
         </button>
         <button className="danger" onClick={handleWipe}>
           Tüm Veriyi Temizle

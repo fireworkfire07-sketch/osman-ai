@@ -16,6 +16,12 @@ const FIELD_LABELS = {
 
 const isPlainObject = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 
+// Sohbet geçmişi ayrı bir akışla (Yeni Sohbet / Konuşmayı Dışa Aktar,
+// bkz. ChatPanel.js) zaten yönetiliyor; Veri Yönetimi'ndeki dışa/içe
+// aktarma yalnızca profil/proje/görev/karar/hafıza/araştırma verisini
+// kapsar, sohbet geçmişini hiç içermez.
+const BACKUP_FIELD_NAMES = Object.keys(STORAGE_KEYS).filter((name) => name !== "chatHistory");
+
 // Her STORAGE_KEYS alanının beklenen şekli. İçe aktarılan dosya bunlarla
 // eşleşmezse o alan atlanır (mevcut veri dokunulmadan kalır) — hiçbir zaman
 // yanlış şekilli veri localStorage'a yazılmaz, bu da app/page.js'teki
@@ -36,7 +42,8 @@ const FIELD_VALIDATORS = {
 
 export function exportAllData() {
   const data = { exportedAt: new Date().toISOString() };
-  Object.entries(STORAGE_KEYS).forEach(([name, key]) => {
+  BACKUP_FIELD_NAMES.forEach((name) => {
+    const key = STORAGE_KEYS[name];
     const raw = window.localStorage.getItem(key);
     if (!raw) {
       data[name] = null;
@@ -93,7 +100,7 @@ export function validateImportData(data) {
   const skipped = [];
   const errors = [];
 
-  Object.keys(STORAGE_KEYS).forEach((name) => {
+  BACKUP_FIELD_NAMES.forEach((name) => {
     if (!(name in data) || data[name] === undefined || data[name] === null) return;
     const validator = FIELD_VALIDATORS[name];
     if (validator(data[name])) {
