@@ -5,7 +5,7 @@ import { isRepositoryRequest, buildRepositoryEvidence } from "../../lib/tools/to
 import { extractClaimedPaths, validateClaimedPaths, validateLineRanges } from "../../lib/grounding/validateClaims";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 
 const REPOSITORY_ACCESS_FAILED_MESSAGE =
   "Repository'ye erişemedim. Bu nedenle herhangi bir dosya, fonksiyon veya satır iddiasında bulunamam.";
