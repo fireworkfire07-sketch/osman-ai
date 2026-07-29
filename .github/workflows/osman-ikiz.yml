@@ -1,0 +1,49 @@
+name: Osman İkiz
+
+on:
+  schedule:
+    - cron: "0 6 * * *"   # her gün 06:00 UTC ≈ 09:00 Türkiye
+  workflow_dispatch:
+    inputs:
+      hedef:
+        description: "İkizin bugünkü hedefi"
+        required: false
+        default: "Osman'ın YouTube nişi için bugün denenebilecek TEK bir güçlü hook fikri üret; kısa gerekçesiyle hafızana 'sonraki_adim' olarak yaz."
+      dry_run:
+        description: "Kuru çalışma (Groq'a gitmeden test)"
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: write   # hafızayı repoya geri yazabilmek için
+
+concurrency:
+  group: osman-ikiz
+  cancel-in-progress: false
+
+jobs:
+  ikiz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: İkizi çalıştır
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          GROQ_MODEL: openai/gpt-oss-120b
+          HEDEF: ${{ github.event.inputs.hedef }}
+          DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
+        run: node scripts/agent.mjs
+
+      - name: Hafızayı commit'le
+        run: |
+          git config user.name "osman-ikiz"
+          git config user.email "actions@users.noreply.github.com"
+          git add brain/memory.json
+          git diff --staged --quiet || git commit -m "ikiz: hafiza guncellendi $(date -u +%F_%T)"
+          git push
