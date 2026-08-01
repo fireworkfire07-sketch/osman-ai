@@ -16,7 +16,18 @@ export async function GET() {
   return Response.json({
     groqKeyPresent: Boolean(process.env.GROQ_API_KEY),
     githubTokenPresent: Boolean(process.env.GITHUB_TOKEN),
+    osmanProfilePresent: Boolean(process.env.OSMAN_PROFILE),
   });
+}
+
+// OSMAN_PROFILE, localStorage'dan gelen (cihaza bağlı) dinamik bağlamdan
+// FARKLI: Vercel Environment Variables'da tutulan, her istekte HER ZAMAN
+// dahil edilen, cihazdan bağımsız kalıcı bir temel kimlik metnidir. Boşsa
+// hiçbir şey eklenmez, mevcut davranış aynı kalır. Değeri asla loglanmaz.
+function buildOsmanProfileBlock() {
+  const profile = (process.env.OSMAN_PROFILE || "").trim();
+  if (!profile) return "";
+  return `\n\n---\nOSMAN TEMEL PROFİLİ (kalıcı, cihazdan bağımsız):\n${profile}`;
 }
 
 function streamGroqTokens(groqRes) {
@@ -156,9 +167,10 @@ export async function POST(request) {
   }
 
   const systemContent =
-    (dynamicContext
-      ? `${SYSTEM_PROMPT}\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}`
-      : SYSTEM_PROMPT) + repositoryBlock;
+    SYSTEM_PROMPT +
+    buildOsmanProfileBlock() +
+    (dynamicContext ? `\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}` : "") +
+    repositoryBlock;
 
   const chatMessages = [{ role: "system", content: systemContent }, ...history.map(toGroqMessage).filter(Boolean)];
 
