@@ -21,13 +21,12 @@ function araclariSec(text) {
   return ARACLAR.filter((arac) => adlar.has(arac.function.name));
 }
 
-async function groqTuru(mesajlar, contextData, araclar, researchEvidence = null, researchRequest = false) {
+async function groqTuru(mesajlar, contextData) {
   const cevap = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: mesajlar, context: contextData, araclar, researchEvidence, researchRequest }),
+    body: JSON.stringify({ messages: mesajlar, context: contextData }),
   });
-
   if (!cevap.ok) {
     const hata = await cevap.json().catch(() => ({}));
     throw new Error([hata.error, hata.detail, hata.groqStatus ? `Groq HTTP ${hata.groqStatus}` : ""].filter(Boolean).join("\n"));
@@ -40,40 +39,14 @@ async function groqTuru(mesajlar, contextData, araclar, researchEvidence = null,
 // kendi collection fonksiyonlarıyla (agentTools.js) çalıştırır ve role:"tool"
 // mesajı olarak ekleyip tekrar gönderir. En fazla MAX_ARAC_TURU tur.
 async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
-  const sonMesajlar = baslangicMesajlari.slice(-MAX_MODEL_MESAJ);
-  const araclar = araclariSec(sonMesajlar[sonMesajlar.length - 1]?.content);
-  let mesajlar = sonMesajlar.map((m) => ({ role: m.role, content: m.content }));
-  const yapilanKayitlar = [];
-
-  // Güncel araştırma da dahil tüm istekler yalnızca /api/chat üzerinden gider.
-  for (let tur = 0; tur < MAX_ARAC_TURU; tur++) {
-    const veri = await groqTuru(mesajlar, contextData, araclar, null, araclar.some((a) => a.function.name === "web_arastir"));
-    const mesaj = veri?.choices?.[0]?.message;
-    if (!mesaj) throw new Error("AI'dan geçerli bir cevap alınamadı.");
-
-    if (!mesaj.tool_calls || mesaj.tool_calls.length === 0) {
-      return { metin: mesaj.content || "", kayitlar: yapilanKayitlar };
-    }
-
-    mesajlar.push(mesaj);
-
-    for (const cagri of mesaj.tool_calls) {
-      let sonuc;
-      try {
-        const girdi = JSON.parse(cagri.function.arguments);
-        sonuc = await araciCalistir(cagri.function.name, girdi);
-        if (sonuc?.ok) {
-          yapilanKayitlar.push({ arac: cagri.function.name, baslik: girdi.baslik || girdi.proje || "" });
-          if (sonuc.refresh) onDataChanged?.(sonuc.refresh);
-        }
-      } catch (e) {
-        sonuc = { hata: e?.message || "araç çalıştırılamadı" };
-      }
-      mesajlar.push({ role: "tool", tool_call_id: cagri.id, name: cagri.function.name, content: JSON.stringify(sonuc) });
-    }
-  }
-
-  return { metin: "İşlem tamamlanamadı, çok fazla adım gerekti.", kayitlar: yapilanKayitlar };
+  const mesajlar = baslangicMesajlari.slice(-MAX_MODEL_MESAJ).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  const veri = await groqTuru(mesajlar, contextData);
+  const mesaj = veri?.choices?.[0]?.message;
+  if (!mesaj) throw new Error("AI'dan geçerli cevap alınamadı.");
+  return { metin: mesaj.content || "", kayitlar: [] };
 }
 
 export default function ChatPanel({ contextData, onError, onDataChanged }) {
