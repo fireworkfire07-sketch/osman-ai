@@ -199,7 +199,7 @@ export async function POST(request) {
           tools: araclar,
           tool_choice: "auto",
           parallel_tool_calls: false,
-          max_completion_tokens: 1024,
+          max_completion_tokens: 512,
           reasoning_effort: "low",
         }),
       });
