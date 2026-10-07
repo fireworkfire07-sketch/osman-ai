@@ -91,7 +91,7 @@ export async function auditSystem(options = {}) {
       check: "tests",
       target: "npm test",
       ok: test.ok,
-      detail: test.ok ? "testler geçti" : `Basarisiz testler: ${(test.stderr || test.stdout).split("\\n").filter((line) => line.startsWith("not ok ")).join(" | ")}\n--- SON ---\n${(test.stdout || test.stderr).slice(-1200)}`,
+      detail: test.ok ? "testler geçti" : `Basarisiz testler: ${(test.stdout || test.stderr).split("\n").filter((line) => line.startsWith("not ok ")).join(" | ")}\n--- SON ---\n${(test.stdout || test.stderr).slice(-1200)}`,
     });
 
     const build = await run(process.platform === "win32" ? "npm.cmd" : "npm", ["run", "build"], root);
