@@ -21,11 +21,11 @@ function araclariSec(text) {
   return ARACLAR.filter((arac) => adlar.has(arac.function.name));
 }
 
-async function groqTuru(mesajlar, contextData, araclar) {
+async function groqTuru(mesajlar, contextData, araclar, researchEvidence = null) {
   const cevap = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: mesajlar, context: contextData, araclar }),
+    body: JSON.stringify({ messages: mesajlar, context: contextData, araclar, researchEvidence }),
   });
 
   if (!cevap.ok) {
@@ -45,8 +45,65 @@ async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
   let mesajlar = sonMesajlar.map((m) => ({ role: m.role, content: m.content }));
   const yapilanKayitlar = [];
 
+  // Güncel web araştırmasını Groq tool-call zincirinden ayırıyoruz.
+  // Böylece araştırma isteğinde Groq -> tool -> browser -> Groq döngüsüne
+  // girmeden önce gerçek /api/research sonucu doğrudan alınır.
+  const webAraci = araclar.find((arac) => arac.function.name === "web_arastir");
+  if (webAraci) {
+    const query = String(sonMesajlar[sonMesajlar.length - 1]?.content || "").trim().slice(0, 300);
+    let research;
+
+    try {
+      const response = await fetch("/api/research", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query }),
+      });
+
+      const raw = await response.text();
+      let data = {};
+      try {
+        data = raw ? JSON.parse(raw) : {};
+      } catch {
+        data = {
+          ok: false,
+          researchStatus: "research_failed",
+          results: [],
+          query,
+          hata: "Araştırma endpoint'i JSON yerine geçersiz bir cevap döndürdü.",
+        };
+      }
+
+      if (!response.ok || data?.ok !== true || !Array.isArray(data?.results) || data.results.length === 0) {
+        return {
+          metin: "KANIT: Güncel araştırma başarısız veya sonuçsuz.\nÇIKARIM: Güvenilir güncel pazar verisi yok.\nKARAR: ARAŞTIRMA BAŞARISIZ\nNİŞ SEÇİMİ: HENÜZ YAPILMADI",
+          kayitlar: yapilanKayitlar,
+        };
+      }
+
+      research = {
+        ok: true,
+        researchStatus: "success",
+        query,
+        source: data.source || "",
+        searchedAt: data.searchedAt || "",
+        results: data.results,
+      };
+    } catch (e) {
+      return {
+        metin: "KANIT: Güncel araştırma başarısız veya sonuçsuz.\nÇIKARIM: Güvenilir güncel pazar verisi yok.\nKARAR: ARAŞTIRMA BAŞARISIZ\nNİŞ SEÇİMİ: HENÜZ YAPILMADI",
+        kayitlar: yapilanKayitlar,
+      };
+    }
+
+    const veri = await groqTuru(mesajlar, contextData, [], research);
+    const mesaj = veri?.choices?.[0]?.message;
+    if (!mesaj) throw new Error("AI'dan geçerli bir cevap alınamadı.");
+    return { metin: mesaj.content || "", kayitlar: yapilanKayitlar };
+  }
+
   for (let tur = 0; tur < MAX_ARAC_TURU; tur++) {
-    const veri = await groqTuru(mesajlar, contextData, araclar);
+    const veri = await groqTuru(mesajlar, contextData, araclar, null);
     const mesaj = veri?.choices?.[0]?.message;
     if (!mesaj) throw new Error("AI'dan geçerli bir cevap alınamadı.");
 
