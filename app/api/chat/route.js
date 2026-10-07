@@ -286,7 +286,7 @@ export async function POST(request) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         temperature: 0.6,
-        stream: true,
+        stream: !researchEvidence,
         messages: chatMessages,
       }),
     });
@@ -305,6 +305,11 @@ export async function POST(request) {
       { error: "AI servisinden cevap alınamadı. Lütfen birazdan tekrar dene." },
       { status: 502 }
     );
+  }
+
+  if (researchEvidence) {
+    const data = await groqRes.json();
+    return Response.json(data);
   }
 
   const stream = streamGroqTokens(groqRes);
