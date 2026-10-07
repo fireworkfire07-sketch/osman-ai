@@ -22,11 +22,11 @@ function extractResults(html) {
   const blocks = String(html || "").split(/<div class="result[^"]*">/i).slice(1);
 
   for (const block of blocks) {
-    const linkMatch = block.match(/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\\s\\S]*?)<\/a>/i);
+    const linkMatch = block.match(/<a[^>]+class="[^"]*result__a[^"]*"[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/i);
     if (!linkMatch) continue;
 
-    const snippetMatch = block.match(/<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\\s\\S]*?)<\/a>/i)
-      || block.match(/<div[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\\s\\S]*?)<\/div>/i);
+    const snippetMatch = block.match(/<a[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/a>/i)
+      || block.match(/<div[^>]+class="[^"]*result__snippet[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
 
     let url = decodeHtml(linkMatch[1]);
     const uddg = url.match(/[?&]uddg=([^&]+)/i);
