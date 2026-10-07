@@ -56,13 +56,13 @@ function extractDuckDuckGoResults(html) {
 
 function extractGoogleNewsRss(xml) {
   const results = [];
-  const items = String(xml || "").match(/<item>[\\s\\S]*?<\\/item>/gi) || [];
+  const items = String(xml || "").match(/<item>[\s\S]*?<\/item>/gi) || [];
 
   for (const item of items) {
-    const title = item.match(/<title>([\\s\\S]*?)<\\/title>/i)?.[1] || "";
-    const link = item.match(/<link>([\\s\\S]*?)<\\/link>/i)?.[1] || "";
-    const pubDate = item.match(/<pubDate>([\\s\\S]*?)<\\/pubDate>/i)?.[1] || "";
-    const description = item.match(/<description>([\\s\\S]*?)<\\/description>/i)?.[1] || "";
+    const title = item.match(/<title>([\s\S]*?)<\/title>/i)?.[1] || "";
+    const link = item.match(/<link>([\s\S]*?)<\/link>/i)?.[1] || "";
+    const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/i)?.[1] || "";
+    const description = item.match(/<description>([\s\S]*?)<\/description>/i)?.[1] || "";
 
     addResult(
       results,
