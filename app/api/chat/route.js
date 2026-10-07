@@ -197,6 +197,8 @@ export async function POST(request) {
           tools: araclar,
           tool_choice: "auto",
           parallel_tool_calls: false,
+          max_completion_tokens: 2048,
+          reasoning_effort: "low",
         }),
       });
     } catch (err) {
