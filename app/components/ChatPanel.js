@@ -46,7 +46,7 @@ async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
       let sonuc;
       try {
         const girdi = JSON.parse(cagri.function.arguments);
-        sonuc = araciCalistir(cagri.function.name, girdi);
+        sonuc = await araciCalistir(cagri.function.name, girdi);
         if (sonuc?.ok) {
           yapilanKayitlar.push({ arac: cagri.function.name, baslik: girdi.baslik || girdi.proje || "" });
           if (sonuc.refresh) onDataChanged?.(sonuc.refresh);
