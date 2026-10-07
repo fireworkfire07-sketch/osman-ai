@@ -119,26 +119,17 @@ function toGroqMessage(m) {
 }
 
 export async function POST(request) {
-  // Oran sınırlaması, GROQ anahtarının varlığından bile önce kontrol edilir:
-  // amaç yalnızca gerçek GROQ isteklerini değil, bu endpoint'e yapılan her
-  // türlü kötüye kullanımı erken reddetmektir.
-  const clientIp = getClientIp(request);
-  const rateLimit = checkRateLimit(clientIp);
+  const rateLimit = await checkRateLimit(request);
   if (!rateLimit.allowed) {
     return Response.json(
-      {
-        error: `Çok fazla mesaj gönderildi. Ücretsiz AI kotasını korumak için lütfen ${rateLimit.retryAfterSeconds} saniye sonra tekrar dene.`,
-      },
+      { error: `Çok fazla mesaj gönderildi. Lütfen ${rateLimit.retryAfterSeconds} saniye sonra tekrar dene.` },
       { status: 429 }
     );
   }
 
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    return Response.json(
-      { error: "AI anahtarı sunucuda tanımlı değil. Vercel Environment Variables içine GROQ_API_KEY eklenmeli." },
-      { status: 500 }
-    );
+    return Response.json({ error: "GROQ_API_KEY sunucuda tanımlı değil." }, { status: 500 });
   }
 
   let body;
@@ -149,201 +140,19 @@ export async function POST(request) {
   }
 
   const history = Array.isArray(body?.messages) ? body.messages : [];
-  const researchRequested = body?.researchRequest === true;
-  const araclar = researchRequested
-    ? null
-    : (Array.isArray(body?.araclar) && body.araclar.length > 0 ? body.araclar : null);
   const dynamicContext = buildDynamicContext(body?.context || {});
-  const lastUserMessage = [...history].reverse().find((m) => m.role === "user")?.content || "";
-  let researchEvidence =
-    body?.researchEvidence &&
-    body.researchEvidence.researchStatus === "success" &&
-    Array.isArray(body.researchEvidence.results) &&
-    body.researchEvidence.results.length > 0
-      ? body.researchEvidence
-      : null;
-
-  if (researchRequested) {
-    const researchQuery = String(lastUserMessage || "").trim().slice(0, 300);
-    try {
-      const researchMessages = [
-        {
-          role: "system",
-          content:
-            TOOL_SYSTEM_PROMPT +
-            "\n\nGÜNCEL WEB ARAŞTIRMASI: Kullanıcının isteğini güncel web kaynaklarıyla araştır. Güvenilir kaynaklardan birden fazla sonuç kullan. Kanıt, çıkarım ve hipotezi ayır. Kaynakları cevabında açıkça belirt."
-        },
-        ...history.map(toGroqMessage).filter(Boolean),
-      ];
-
-      const researchGroqRes = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          temperature: 0.3,
-          stream: false,
-          messages: researchMessages,
-          tools: [{ type: "browser_search" }],
-          tool_choice: "required",
-          max_completion_tokens: 1024,
-          reasoning_effort: "low",
-        }),
-      });
-
-      if (!researchGroqRes.ok) {
-        const detail = await researchGroqRes.text();
-        console.error("GROQ_BROWSER_SEARCH_ERROR", researchGroqRes.status, detail);
-        return Response.json(
-          {
-            error: `Groq web araştırması HTTP ${researchGroqRes.status}: ${detail.slice(0, 2000)}`,
-            groqStatus: researchGroqRes.status,
-          },
-          { status: 502 }
-        );
-      }
-
-      const researchData = await researchGroqRes.json();
-      const researchMessage = researchData?.choices?.[0]?.message;
-      if (!researchMessage?.content) {
-        return Response.json(
-          { error: "Web araştırması sonuç üretemedi." },
-          { status: 502 }
-        );
-      }
-
-      return Response.json(researchData);
-    } catch (err) {
-      console.error("GROQ_BROWSER_SEARCH_FAILED", err);
-      return Response.json(
-        { error: `Web araştırması çalıştırılamadı: ${err?.message || "bilinmeyen hata"}` },
-        { status: 502 }
-      );
-    }
-  }
-
-  // Repository ile ilgili bir istek mi? Öyleyse gerçek GitHub API kanıtı
-  // (repo allowlist: yalnızca fireworkfire07-sketch/osman-ai) toplanır ve
-  // modele KESİN kurallarla birlikte verilir; kanıt yoksa model hiçbir
-  // dosya/satır iddiasında bulunamayacağını açıkça bilir (bkz. aşağıdaki
-  // server-side doğrulama — halüsinasyon kilidi).
-  const repoRequested = isRepositoryRequest(lastUserMessage);
-  let repoEvidence = null;
-  let repoAccessFailed = false;
-
-  if (repoRequested) {
-    if (!process.env.GITHUB_TOKEN) {
-      repoAccessFailed = true;
-    } else {
-      try {
-        repoEvidence = await buildRepositoryEvidence(lastUserMessage);
-      } catch (err) {
-        console.error("GITHUB_REPO_ACCESS_FAILED", err?.message);
-        repoAccessFailed = true;
-      }
-    }
-  }
-
-  let repositoryBlock = "";
-  if (repoRequested) {
-    repositoryBlock = repoAccessFailed
-      ? `\n\n---\nREPOSITORY ARACI ÇALIŞTIRILAMADI: Repository'ye erişemedim. Bu nedenle hiçbir dosya adı, satır numarası, fonksiyon veya teknik borç/güvenlik açığı uydurma; yalnızca "Repository'ye erişemedim" de.`
-      : `\n\n---\nREPOSITORY KANITI (gerçek GitHub API sonucu, ${ALLOWED_REPO_LABEL}, commit ${repoEvidence.commitShortSha || "bilinmiyor"}):\n${repoEvidence.evidenceText || "(ilgili dosya bulunamadı)"}\n\nKESİN KURALLAR:\n- Yalnızca yukarıdaki [SOURCE n] bloklarında verilen dosya yolunu ve satırları kullan.\n- Yukarıda verilmeyen hiçbir dosya adını, satır numarasını veya fonksiyonu söyleme.\n- Dosyanın yaşını veya geçmişini commit verisi olmadan tahmin etme.\n- "Kodda gördüm", "dosyaları inceledim" veya "kanıtladım" ifadelerini yalnızca yukarıdaki gerçek kanıt varsa kullan.\n- Her teknik iddiadan sonra "Kanıt: <dosya yolu>:<satırlar>" ekle.\n- Yetersiz kanıt varsa "Doğrulanamadı" de.`;
-  }
-
-  const baseSystemPrompt = araclar || researchEvidence || researchRequested ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT;
-  const researchBlock = researchEvidence
-    ? `\n\n---\nGÜNCEL ARAŞTIRMA KANITI:\nBu istekte güncel araştırma doğrudan /api/research üzerinden başarıyla yapıldı. Aşağıdaki sonuçlar gerçek araştırma çıktısıdır. Yalnızca bu kanıtın desteklediği iddiaları kullan; sonucu güncel web erişimi yapmış gibi genişletme. KANIT / ÇIKARIM / HİPOTEZ ayrımını koru.\n${JSON.stringify(researchEvidence).slice(0, 14000)}`
-    : "";
-
   const systemContent =
-    baseSystemPrompt +
+    SYSTEM_PROMPT +
     buildOsmanProfileBlock() +
-    (dynamicContext ? `\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}` : "") +
-    researchBlock +
-    repositoryBlock;
+    (dynamicContext ? `\n\n---\nOsman hakkında bilinenler:\n${dynamicContext}` : "");
 
-  const chatMessages = [{ role: "system", content: systemContent }, ...history.map(toGroqMessage).filter(Boolean)];
+  const messages = [
+    { role: "system", content: systemContent },
+    ...history.slice(-8).map(toGroqMessage).filter(Boolean),
+  ];
 
-  // Araç çağırma turu (A2, yapım emri Bölüm 2a): route.js ince proxy olarak
-  // kalır — Groq'a "tools" iletir, ham cevabı (tool_calls dahil) aynen
-  // döndürür. Hiçbir aracı burada ÇALIŞTIRMAZ; döngü tarayıcıda kurulu.
-  // Repository kanıt doğrulaması (halüsinasyon kilidi) burada da uygulanır,
-  // çünkü ChatPanel artık her mesajda "araclar" gönderiyor ve akan
-  // (streaming) yol aşağıda repository istekleri için artık kullanılmıyor.
-  if (araclar) {
-    let toolGroqRes;
-    try {
-      toolGroqRes = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          temperature: 0.6,
-          stream: false,
-          messages: chatMessages,
-          tools: araclar,
-          tool_choice: "auto",
-          parallel_tool_calls: false,
-          max_completion_tokens: 512,
-          reasoning_effort: "low",
-        }),
-      });
-    } catch (err) {
-      console.error("GROQ_REQUEST_FAILED", err);
-      return Response.json(
-        { error: "AI servisine bağlanılamadı. İnternet bağlantını ve GROQ anahtarını kontrol et." },
-        { status: 502 }
-      );
-    }
-
-    if (!toolGroqRes.ok) {
-      const detail = await toolGroqRes.text();
-      console.error("GROQ_API_ERROR", toolGroqRes.status, detail);
-      return Response.json(
-        {
-          error: `Groq HTTP ${toolGroqRes.status}: ${detail.slice(0, 2000)}`,
-          groqStatus: toolGroqRes.status,
-        },
-        { status: 502 }
-      );
-    }
-
-    const data = await toolGroqRes.json();
-    const mesaj = data?.choices?.[0]?.message;
-
-    if (repoRequested && mesaj && typeof mesaj.content === "string" && mesaj.content) {
-      if (repoAccessFailed) {
-        const claims = extractClaimedPaths(mesaj.content);
-        if (claims.length > 0) mesaj.content = REPOSITORY_ACCESS_FAILED_MESSAGE;
-      } else if (repoEvidence) {
-        const claims = extractClaimedPaths(mesaj.content);
-        const { invalid: invalidPaths } = validateClaimedPaths(claims, repoEvidence.tree);
-        const invalidLines = validateLineRanges(claims, repoEvidence.sources);
-
-        if (invalidPaths.length > 0 || invalidLines.length > 0) {
-          mesaj.content = REPOSITORY_UNVERIFIED_CLAIM_MESSAGE;
-        } else if (repoEvidence.sources.length > 0) {
-          const sourceLines = repoEvidence.sources.map((s) => `- ${s.path}:${s.lines}`).join("\n");
-          mesaj.content += `\n\nKullanılan kaynaklar:\n${sourceLines}${
-            repoEvidence.commitShortSha ? `\nCommit: ${repoEvidence.commitShortSha}` : ""
-          }`;
-        }
-      }
-    }
-
-    return Response.json(data);
-  }
-
-  let groqRes;
   try {
-    groqRes = await fetch(GROQ_URL, {
+    const groqRes = await fetch(GROQ_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
@@ -353,31 +162,27 @@ export async function POST(request) {
         model: GROQ_MODEL,
         temperature: 0.6,
         stream: false,
-        messages: chatMessages,
-        max_completion_tokens: 1024,
+        messages,
+        max_completion_tokens: 512,
         reasoning_effort: "low",
       }),
     });
+
+    if (!groqRes.ok) {
+      const detail = await groqRes.text();
+      console.error("GROQ_API_ERROR", groqRes.status, detail);
+      return Response.json(
+        { error: `Groq HTTP ${groqRes.status}: ${detail.slice(0, 2000)}`, groqStatus: groqRes.status },
+        { status: 502 }
+      );
+    }
+
+    return Response.json(await groqRes.json());
   } catch (err) {
-    console.error("GROQ_REQUEST_FAILED", err);
+    console.error("CHAT_ROUTE_FAILED", err);
     return Response.json(
-      { error: "AI servisine bağlanılamadı. İnternet bağlantını ve GROQ anahtarını kontrol et." },
+      { error: `Sunucu sohbet hatası: ${err?.message || "bilinmeyen hata"}` },
       { status: 502 }
     );
   }
-
-  if (!groqRes.ok) {
-    const detail = await groqRes.text();
-    console.error("GROQ_API_ERROR", groqRes.status, detail);
-    return Response.json(
-      {
-        error: `Groq HTTP ${groqRes.status}: ${detail.slice(0, 2000)}`,
-        groqStatus: groqRes.status,
-      },
-      { status: 502 }
-    );
-  }
-
-  const data = await groqRes.json();
-  return Response.json(data);
 }
