@@ -196,6 +196,7 @@ export async function POST(request) {
           messages: chatMessages,
           tools: araclar,
           tool_choice: "auto",
+          parallel_tool_calls: false,
         }),
       });
     } catch (err) {
