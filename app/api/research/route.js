@@ -17,37 +17,76 @@ function cleanText(value) {
     .trim();
 }
 
-function extractResults(html) {
+function normaliseUrl(value) {
+  let url = decodeHtml(value).trim();
+  const uddg = url.match(/[?&]uddg=([^&]+)/i);
+  if (uddg) {
+    try { url = decodeURIComponent(uddg[1]); } catch {}
+  }
+  return url;
+}
+
+function addResult(results, title, url, snippet) {
+  const cleanUrl = normaliseUrl(url);
+  const cleanTitle = cleanText(title);
+  if (!cleanTitle || !/^https?:\/\//i.test(cleanUrl)) return;
+  if (results.some((item) => item.url === cleanUrl)) return;
+
+  results.push({
+    title: cleanTitle,
+    url: cleanUrl,
+    snippet: cleanText(snippet || ""),
+  });
+}
+
+function extractDuckDuckGoResults(html) {
   const results = [];
-  const source = String(html || "");
-  const blocks = source.split(/<div[^>]+class=["'][^"']*result[^"']*["'][^>]*>/i).slice(1);
+  const blocks = String(html || "")
+    .split(/<div[^>]+class=["'][^"']*result[^"']*["'][^>]*>/i)
+    .slice(1);
 
   for (const block of blocks) {
-    const linkMatch = block.match(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i)
-      || block.match(/<a[^>]*href=["']([^"']+)["'][^>]*class=["'][^"']*result__a[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
+    const linkMatch =
+      block.match(/<a[^>]+class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i) ||
+      block.match(/<a[^>]*href=["']([^"']+)["'][^>]*class=["'][^"']*result__a[^"']*["'][^>]*>([\s\S]*?)<\/a>/i);
+
     if (!linkMatch) continue;
 
     const snippetMatch = block.match(/<(?:a|div)[^>]+class=["'][^"']*result__snippet[^"']*["'][^>]*>([\s\S]*?)<\/(?:a|div)>/i);
-
-    let url = decodeHtml(linkMatch[1]);
-    const uddg = url.match(/[?&]uddg=([^&]+)/i);
-    if (uddg) {
-      try { url = decodeURIComponent(uddg[1]); } catch {}
-    }
-
-    const title = cleanText(linkMatch[2]);
-    if (!title || !/^https?:\/\//i.test(url)) continue;
-
-    results.push({
-      title,
-      url,
-      snippet: cleanText(snippetMatch?.[1] || ""),
-    });
+    addResult(results, linkMatch[2], linkMatch[1], snippetMatch?.[1] || "");
 
     if (results.length >= MAX_RESULTS) break;
   }
 
   return results;
+}
+
+function extractBingResults(html) {
+  const results = [];
+  const blocks = String(html || "")
+    .split(/<li[^>]+class=["'][^"']*b_algo[^"']*["'][^>]*>/i)
+    .slice(1);
+
+  for (const block of blocks) {
+    const linkMatch = block.match(/<h2[^>]*>\s*<a[^>]+href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h2>/i);
+    if (!linkMatch) continue;
+
+    const snippetMatch =
+      block.match(/<p[^>]*>([\s\S]*?)<\/p>/i) ||
+      block.match(/<div[^>]+class=["'][^"']*b_caption[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+
+    addResult(results, linkMatch[2], linkMatch[1], snippetMatch?.[1] || "");
+
+    if (results.length >= MAX_RESULTS) break;
+  }
+
+  return results;
+}
+
+function extractResults(html, source) {
+  return source === "Bing HTML"
+    ? extractBingResults(html)
+    : extractDuckDuckGoResults(html);
 }
 
 async function fetchSearch(url, source) {
@@ -63,7 +102,7 @@ async function fetchSearch(url, source) {
     });
     if (!response.ok) return { ok: false, status: response.status, source };
     const html = await response.text();
-    return { ok: true, source, html, results: extractResults(html) };
+    return { ok: true, source, html, results: extractResults(html, source) };
   } catch (error) {
     return {
       ok: false,
