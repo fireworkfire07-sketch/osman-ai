@@ -166,28 +166,62 @@ export async function POST(request) {
   if (researchRequested) {
     const researchQuery = String(lastUserMessage || "").trim().slice(0, 300);
     try {
-      const research = await performWebResearch(researchQuery);
-      if (!research.ok || research.researchStatus !== "success" || !Array.isArray(research.results) || research.results.length === 0) {
-        return Response.json({
-          choices: [{
-            message: {
-              role: "assistant",
-              content: "KANIT: Güncel araştırma başarısız veya sonuçsuz.\nÇIKARIM: Güvenilir güncel pazar verisi yok.\nKARAR: ARAŞTIRMA BAŞARISIZ\nNİŞ SEÇİMİ: HENÜZ YAPILMADI"
-            }
-          }]
-        });
-      }
-      researchEvidence = research;
-    } catch (err) {
-      console.error("RESEARCH_REQUEST_FAILED", err?.message);
-      return Response.json({
-        choices: [{
-          message: {
-            role: "assistant",
-            content: "KANIT: Güncel araştırma başarısız veya sonuçsuz.\nÇIKARIM: Güvenilir güncel pazar verisi yok.\nKARAR: ARAŞTIRMA BAŞARISIZ\nNİŞ SEÇİMİ: HENÜZ YAPILMADI"
-          }
-        }]
+      const researchMessages = [
+        {
+          role: "system",
+          content:
+            TOOL_SYSTEM_PROMPT +
+            "\n\nGÜNCEL WEB ARAŞTIRMASI: Kullanıcının isteğini güncel web kaynaklarıyla araştır. Güvenilir kaynaklardan birden fazla sonuç kullan. Kanıt, çıkarım ve hipotezi ayır. Kaynakları cevabında açıkça belirt."
+        },
+        ...history.map(toGroqMessage).filter(Boolean),
+      ];
+
+      const researchGroqRes = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          temperature: 0.3,
+          stream: false,
+          messages: researchMessages,
+          tools: [{ type: "browser_search" }],
+          tool_choice: "required",
+          max_completion_tokens: 1024,
+          reasoning_effort: "low",
+        }),
       });
+
+      if (!researchGroqRes.ok) {
+        const detail = await researchGroqRes.text();
+        console.error("GROQ_BROWSER_SEARCH_ERROR", researchGroqRes.status, detail);
+        return Response.json(
+          {
+            error: `Groq web araştırması HTTP ${researchGroqRes.status}: ${detail.slice(0, 2000)}`,
+            groqStatus: researchGroqRes.status,
+          },
+          { status: 502 }
+        );
+      }
+
+      const researchData = await researchGroqRes.json();
+      const researchMessage = researchData?.choices?.[0]?.message;
+      if (!researchMessage?.content) {
+        return Response.json(
+          { error: "Web araştırması sonuç üretemedi." },
+          { status: 502 }
+        );
+      }
+
+      return Response.json(researchData);
+    } catch (err) {
+      console.error("GROQ_BROWSER_SEARCH_FAILED", err);
+      return Response.json(
+        { error: `Web araştırması çalıştırılamadı: ${err?.message || "bilinmeyen hata"}` },
+        { status: 502 }
+      );
     }
   }
 
@@ -220,7 +254,7 @@ export async function POST(request) {
       : `\n\n---\nREPOSITORY KANITI (gerçek GitHub API sonucu, ${ALLOWED_REPO_LABEL}, commit ${repoEvidence.commitShortSha || "bilinmiyor"}):\n${repoEvidence.evidenceText || "(ilgili dosya bulunamadı)"}\n\nKESİN KURALLAR:\n- Yalnızca yukarıdaki [SOURCE n] bloklarında verilen dosya yolunu ve satırları kullan.\n- Yukarıda verilmeyen hiçbir dosya adını, satır numarasını veya fonksiyonu söyleme.\n- Dosyanın yaşını veya geçmişini commit verisi olmadan tahmin etme.\n- "Kodda gördüm", "dosyaları inceledim" veya "kanıtladım" ifadelerini yalnızca yukarıdaki gerçek kanıt varsa kullan.\n- Her teknik iddiadan sonra "Kanıt: <dosya yolu>:<satırlar>" ekle.\n- Yetersiz kanıt varsa "Doğrulanamadı" de.`;
   }
 
-  const baseSystemPrompt = araclar || researchEvidence ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  const baseSystemPrompt = araclar || researchEvidence || researchRequested ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT;
   const researchBlock = researchEvidence
     ? `\n\n---\nGÜNCEL ARAŞTIRMA KANITI:\nBu istekte güncel araştırma doğrudan /api/research üzerinden başarıyla yapıldı. Aşağıdaki sonuçlar gerçek araştırma çıktısıdır. Yalnızca bu kanıtın desteklediği iddiaları kullan; sonucu güncel web erişimi yapmış gibi genişletme. KANIT / ÇIKARIM / HİPOTEZ ayrımını koru.\n${JSON.stringify(researchEvidence).slice(0, 14000)}`
     : "";
@@ -318,8 +352,10 @@ export async function POST(request) {
       body: JSON.stringify({
         model: GROQ_MODEL,
         temperature: 0.6,
-        stream: !researchEvidence,
+        stream: false,
         messages: chatMessages,
+        max_completion_tokens: 1024,
+        reasoning_effort: "low",
       }),
     });
   } catch (err) {
@@ -334,57 +370,14 @@ export async function POST(request) {
     const detail = await groqRes.text();
     console.error("GROQ_API_ERROR", groqRes.status, detail);
     return Response.json(
-      { error: "AI servisinden cevap alınamadı. Lütfen birazdan tekrar dene." },
+      {
+        error: `Groq HTTP ${groqRes.status}: ${detail.slice(0, 2000)}`,
+        groqStatus: groqRes.status,
+      },
       { status: 502 }
     );
   }
 
-  if (researchEvidence) {
-    const data = await groqRes.json();
-    return Response.json(data);
-  }
-
-  const stream = streamGroqTokens(groqRes);
-
-  if (!repoRequested) {
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/plain; charset=utf-8",
-        "Cache-Control": "no-cache",
-      },
-    });
-  }
-
-  // Repository ile ilgili istekler için cevap ÖNCE tamamen toplanır, gerçek
-  // repository ağacı/kanıtıyla doğrulanır, yalnızca doğrulama geçerse (veya
-  // hiç teknik iddia içermiyorsa) kullanıcıya gönderilir. Bu, akış sırasında
-  // doğrulanamayan bir dosya/satır iddiasının kullanıcıya ulaşmasını engeller.
-  let finalText = await readStreamToString(stream);
-
-  if (repoAccessFailed) {
-    const claims = extractClaimedPaths(finalText);
-    if (claims.length > 0) {
-      finalText = REPOSITORY_ACCESS_FAILED_MESSAGE;
-    }
-  } else if (repoEvidence) {
-    const claims = extractClaimedPaths(finalText);
-    const { invalid: invalidPaths } = validateClaimedPaths(claims, repoEvidence.tree);
-    const invalidLines = validateLineRanges(claims, repoEvidence.sources);
-
-    if (invalidPaths.length > 0 || invalidLines.length > 0) {
-      finalText = REPOSITORY_UNVERIFIED_CLAIM_MESSAGE;
-    } else if (repoEvidence.sources.length > 0) {
-      const sourceLines = repoEvidence.sources.map((s) => `- ${s.path}:${s.lines}`).join("\n");
-      finalText += `\n\nKullanılan kaynaklar:\n${sourceLines}${
-        repoEvidence.commitShortSha ? `\nCommit: ${repoEvidence.commitShortSha}` : ""
-      }`;
-    }
-  }
-
-  return new Response(finalText, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-cache",
-    },
-  });
+  const data = await groqRes.json();
+  return Response.json(data);
 }
