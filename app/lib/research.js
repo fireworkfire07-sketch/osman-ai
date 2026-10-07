@@ -1,4 +1,5 @@
 const MAX_RESULTS = 8;
+const NEWS_DOMAINS = ["dha.com.tr", "trthaber.com", "tgrthaber.com", "aa.com.tr", "ntv.com.tr", "haberturk.com", "reuters.com", "apnews.com"];
 const SEARCH_TIMEOUT_MS = 8000;
 
 function decodeHtml(value) {
@@ -107,37 +108,61 @@ async function fetchSearch(url, source) {
 
 export async function performWebResearch(rawQuery) {
   const query = String(rawQuery || "").trim().slice(0, 300);
+  const wantsNews = /haber|güncel|son dakika|bugün|son günler|olay/i.test(query);
   if (!query) {
     return { ok: false, query, results: [], researchStatus: "research_failed", error: "query zorunlu." };
   }
 
-  const encodedQuery = encodeURIComponent(query);
-  const sources = [
-    { name: "DuckDuckGo HTML", url: "https://html.duckduckgo.com/html/?q=" + encodedQuery },
-    { name: "Bing HTML", url: "https://www.bing.com/search?q=" + encodedQuery },
-  ];
+  const searchQueries = wantsNews
+    ? [
+        `${query} (site:dha.com.tr OR site:trthaber.com OR site:tgrthaber.com OR site:aa.com.tr OR site:ntv.com.tr OR site:haberturk.com)`,
+        `${query} Antalya haber son dakika 2026`,
+      ]
+    : [query];
+
+  const sources = [];
+  for (const searchQuery of searchQueries) {
+    const encodedQuery = encodeURIComponent(searchQuery);
+    sources.push(
+      { name: "DuckDuckGo HTML", url: "https://html.duckduckgo.com/html/?q=" + encodedQuery },
+      { name: "Bing HTML", url: "https://www.bing.com/search?q=" + encodedQuery },
+    );
+  }
 
   const failures = [];
 
+  const merged = [];
   for (const source of sources) {
     const result = await fetchSearch(source.url, source.name);
     if (result.ok && result.results.length > 0) {
-      return {
-        ok: true,
-        query,
+      for (const item of result.results) {
+        const isNewsDomain = NEWS_DOMAINS.some((domain) => item.url.toLowerCase().includes(domain));
+        const looksLikeNews = /haber|son dakika|gündem|ekonomi|olay|bakan|vali|yangın|kaza|operasyon/i.test(item.title + " " + item.snippet);
+        if (!wantsNews || isNewsDomain || looksLikeNews) {
+          addResult(merged, item.title, item.url, item.snippet);
+        }
+        if (merged.length >= MAX_RESULTS) break;
+      }
+    } else {
+      failures.push({
         source: result.source,
-        searchedAt: new Date().toISOString(),
-        results: result.results,
-        researchStatus: "success",
-        evidenceRule: "Sonuçlar keşif kanıtıdır; snippet tek başına pazar/başarı kanıtı değildir.",
-      };
+        status: result.status || null,
+        error: result.error || "Sonuç bulunamadı.",
+      });
     }
+    if (merged.length >= MAX_RESULTS) break;
+  }
 
-    failures.push({
-      source: result.source,
-      status: result.status || null,
-      error: result.error || "Sonuç bulunamadı.",
-    });
+  if (merged.length > 0) {
+    return {
+      ok: true,
+      query,
+      source: wantsNews ? "Haber odaklı web araştırması" : "Web araştırması",
+      searchedAt: new Date().toISOString(),
+      results: merged.slice(0, MAX_RESULTS),
+      researchStatus: "success",
+      evidenceRule: "Sonuçlar keşif kanıtıdır; güncellik ve içerik iddiası kaynak sayfasıyla doğrulanmalıdır.",
+    };
   }
 
   return {
