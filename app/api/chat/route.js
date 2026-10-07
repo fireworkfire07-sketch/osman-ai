@@ -4,7 +4,7 @@ import { performWebResearch } from "../../lib/research";
 import { checkRateLimit } from "./rateLimit";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
+const GROQ_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
 function buildOsmanProfileBlock() {
   const profile = (process.env.OSMAN_PROFILE || "").trim();
@@ -87,7 +87,7 @@ export async function POST(request) {
         (context ? `\n\n---\nOsman hakkında bilinenler:\n${context}` : "") +
         researchBlock,
     },
-    ...history.slice(-8).map(toGroqMessage).filter(Boolean),
+    ...history.slice(-4).map(toGroqMessage).filter(Boolean),
   ];
 
   try {
@@ -102,7 +102,7 @@ export async function POST(request) {
         messages,
         temperature: 0.6,
         max_completion_tokens: 512,
-        reasoning_effort: "low",
+        reasoning_effort: GROQ_MODEL === "qwen/qwen3.8-27b" ? "none" : "low",
         stream: false,
       }),
     });
