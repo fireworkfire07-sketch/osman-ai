@@ -3,6 +3,7 @@ import { buildDynamicContext } from "../../lib/context";
 import { checkRateLimit, getClientIp } from "./rateLimit";
 import { isRepositoryRequest, buildRepositoryEvidence } from "../../lib/tools/toolRouter";
 import { extractClaimedPaths, validateClaimedPaths, validateLineRanges } from "../../lib/grounding/validateClaims";
+import { performWebResearch } from "../../lib/research";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
@@ -148,16 +149,47 @@ export async function POST(request) {
   }
 
   const history = Array.isArray(body?.messages) ? body.messages : [];
-  const araclar = Array.isArray(body?.araclar) && body.araclar.length > 0 ? body.araclar : null;
+  const researchRequested = body?.researchRequest === true;
+  const araclar = researchRequested
+    ? null
+    : (Array.isArray(body?.araclar) && body.araclar.length > 0 ? body.araclar : null);
   const dynamicContext = buildDynamicContext(body?.context || {});
   const lastUserMessage = [...history].reverse().find((m) => m.role === "user")?.content || "";
-  const researchEvidence =
+  let researchEvidence =
     body?.researchEvidence &&
     body.researchEvidence.researchStatus === "success" &&
     Array.isArray(body.researchEvidence.results) &&
     body.researchEvidence.results.length > 0
       ? body.researchEvidence
       : null;
+
+  if (researchRequested) {
+    const researchQuery = String(lastUserMessage || "").trim().slice(0, 300);
+    try {
+      const research = await performWebResearch(researchQuery);
+      if (!research.ok || research.researchStatus !== "success" || !Array.isArray(research.results) || research.results.length === 0) {
+        return Response.json({
+          choices: [{
+            message: {
+              role: "assistant",
+              content: "KANIT: Güncel araştırma başarısız veya sonuçsuz.\nÇIKARIM: Güvenilir güncel pazar verisi yok.\nKARAR: ARAŞTIRMA BAŞARISIZ\nNİŞ SEÇİMİ: HENÜZ YAPILMADI"
+            }
+          }]
+        });
+      }
+      researchEvidence = research;
+    } catch (err) {
+      console.error("RESEARCH_REQUEST_FAILED", err?.message);
+      return Response.json({
+        choices: [{
+          message: {
+            role: "assistant",
+            content: "KANIT: Güncel araştırma başarısız veya sonuçsuz.\nÇIKARIM: Güvenilir güncel pazar verisi yok.\nKARAR: ARAŞTIRMA BAŞARISIZ\nNİŞ SEÇİMİ: HENÜZ YAPILMADI"
+          }
+        }]
+      });
+    }
+  }
 
   // Repository ile ilgili bir istek mi? Öyleyse gerçek GitHub API kanıtı
   // (repo allowlist: yalnızca fireworkfire07-sketch/osman-ai) toplanır ve
