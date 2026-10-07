@@ -78,16 +78,20 @@ export async function POST(request) {
     }
   }
 
+  const compactSystemPrompt = String(SYSTEM_PROMPT).slice(0, 4500);
+  const compactContext = String(context || "").slice(0, 800);
+  const compactResearch = String(researchBlock || "").slice(0, 2200);
+
   const messages = [
     {
       role: "system",
       content:
-        SYSTEM_PROMPT +
-        buildOsmanProfileBlock() +
-        (context ? `\n\n---\nOsman hakkında bilinenler:\n${context}` : "") +
-        researchBlock,
+        compactSystemPrompt +
+        buildOsmanProfileBlock().slice(0, 600) +
+        (compactContext ? `\n\n---\nOsman hakkında bilinenler:\n${compactContext}` : "") +
+        compactResearch,
     },
-    ...history.slice(-4).map(toGroqMessage).filter(Boolean),
+    ...history.slice(-2).map(toGroqMessage).filter(Boolean),
   ];
 
   try {
