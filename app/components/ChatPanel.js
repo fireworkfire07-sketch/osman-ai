@@ -18,7 +18,7 @@ async function groqTuru(mesajlar, contextData) {
 
   if (!cevap.ok) {
     const hata = await cevap.json().catch(() => ({}));
-    throw new Error(hata.error || `Sunucu hatası (${cevap.status})`);
+    throw new Error([hata.error, hata.detail, hata.groqStatus ? `Groq HTTP ${hata.groqStatus}` : ""].filter(Boolean).join("\n"));
   }
   return await cevap.json();
 }
