@@ -215,7 +215,6 @@ export async function POST(request) {
           parallel_tool_calls: false,
           max_completion_tokens: 512,
           reasoning_effort: "low",
-          response_format: { type: "json_object" },
         }),
       });
     } catch (err) {
