@@ -230,8 +230,7 @@ export async function POST(request) {
       console.error("GROQ_API_ERROR", toolGroqRes.status, detail);
       return Response.json(
         {
-          error: "AI servisinden cevap alınamadı.",
-          detail: detail.slice(0, 2000),
+          error: `Groq HTTP ${toolGroqRes.status}: ${detail.slice(0, 2000)}`,
           groqStatus: toolGroqRes.status,
         },
         { status: 502 }
