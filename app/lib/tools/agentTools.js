@@ -245,6 +245,7 @@ async function webArastir(girdi) {
 }
 
 const ARAC_HARITASI = {
+  web_arastir: webArastir,
   hafiza_ekle: hafizaEkle,
   karar_ekle: kararEkle,
   gorev_ekle: gorevEkle,
