@@ -193,10 +193,7 @@ async function webArastir(girdi) {
     };
   }
   try {
-    const baseUrl = process.env.VERCEL_URL
-      ? `https://${String(process.env.VERCEL_URL).replace(/^https?:\/\//, "").replace(/\/+$/, "")}`
-      : String(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/+$/, "");
-    const endpoint = `${baseUrl}/api/research`;
+    const endpoint = "/api/research";
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
