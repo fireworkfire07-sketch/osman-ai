@@ -54,6 +54,29 @@ function extractDuckDuckGoResults(html) {
   return results;
 }
 
+function extractGoogleNewsRss(xml) {
+  const results = [];
+  const items = String(xml || "").match(/<item>[\\s\\S]*?<\\/item>/gi) || [];
+
+  for (const item of items) {
+    const title = item.match(/<title>([\\s\\S]*?)<\\/title>/i)?.[1] || "";
+    const link = item.match(/<link>([\\s\\S]*?)<\\/link>/i)?.[1] || "";
+    const pubDate = item.match(/<pubDate>([\\s\\S]*?)<\\/pubDate>/i)?.[1] || "";
+    const description = item.match(/<description>([\\s\\S]*?)<\\/description>/i)?.[1] || "";
+
+    addResult(
+      results,
+      title,
+      link,
+      [pubDate, description].filter(Boolean).join(" — ")
+    );
+
+    if (results.length >= MAX_RESULTS) break;
+  }
+
+  return results;
+}
+
 function extractBingResults(html) {
   const results = [];
   const blocks = String(html || "")
@@ -90,9 +113,11 @@ async function fetchSearch(url, source) {
     if (!response.ok) return { ok: false, status: response.status, source };
 
     const html = await response.text();
-    const results = source === "Bing HTML"
-      ? extractBingResults(html)
-      : extractDuckDuckGoResults(html);
+    const results = source === "Google News RSS"
+      ? extractGoogleNewsRss(html)
+      : source === "Bing HTML"
+        ? extractBingResults(html)
+        : extractDuckDuckGoResults(html);
 
     return { ok: true, source, html, results };
   } catch (error) {
@@ -115,14 +140,28 @@ export async function performWebResearch(rawQuery) {
 
   const searchQueries = wantsNews
     ? [
-        `${query} (site:dha.com.tr OR site:trthaber.com OR site:tgrthaber.com OR site:aa.com.tr OR site:ntv.com.tr OR site:haberturk.com)`,
-        `${query} Antalya haber son dakika 2026`,
+        `${query} Antalya haber`,
+        `${query} Antalya son dakika`,
+        `${query} Antalya güncel`,
       ]
     : [query];
 
   const sources = [];
-  for (const searchQuery of searchQueries) {
-    const encodedQuery = encodeURIComponent(searchQuery);
+  if (wantsNews) {
+    for (const searchQuery of searchQueries) {
+      const encodedQuery = encodeURIComponent(searchQuery);
+      sources.push(
+        {
+          name: "Google News RSS",
+          url: "https://news.google.com/rss/search?q=" + encodedQuery + "&hl=tr&gl=TR&ceid=TR:tr",
+          rss: true,
+        },
+        { name: "DuckDuckGo HTML", url: "https://html.duckduckgo.com/html/?q=" + encodedQuery },
+        { name: "Bing HTML", url: "https://www.bing.com/search?q=" + encodedQuery },
+      );
+    }
+  } else {
+    const encodedQuery = encodeURIComponent(query);
     sources.push(
       { name: "DuckDuckGo HTML", url: "https://html.duckduckgo.com/html/?q=" + encodedQuery },
       { name: "Bing HTML", url: "https://www.bing.com/search?q=" + encodedQuery },
