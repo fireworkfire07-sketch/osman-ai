@@ -12,6 +12,8 @@ const REPOSITORY_ACCESS_FAILED_MESSAGE =
 const REPOSITORY_UNVERIFIED_CLAIM_MESSAGE = "Bu teknik iddiayı repository kanıtıyla doğrulayamadım.";
 const ALLOWED_REPO_LABEL = "fireworkfire07-sketch/osman-ai";
 
+const TOOL_SYSTEM_PROMPT = `Sen OSMAN AI'sin. Türkçe, kısa ve doğrudan cevap ver. Yapmadığın işi yapılmış gibi gösterme; kanıt yoksa varsayım olarak belirt. Kullanıcı güncel pazar/YouTube nişi/talep/rekabet/para fırsatı araştırması istiyorsa önce web_arastir aracını kullan; araştırmadan niş seçme. Sonuçları KANIT / ÇIKARIM / HİPOTEZ diye ayır. Araç sonucu yetersizse bunu açıkça söyle. Kullanıcı soru sormadan ilerlemeni istiyorsa izin isteme. En küçük ölçülebilir testi öner.`;
+
 export async function GET() {
   return Response.json({
     groqKeyPresent: Boolean(process.env.GROQ_API_KEY),
