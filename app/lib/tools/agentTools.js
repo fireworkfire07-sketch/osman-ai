@@ -184,7 +184,14 @@ function hafizaAra(girdi) {
 
 async function webArastir(girdi) {
   const query = String(girdi?.query || "").trim();
-  if (!query) return { hata: "query zorunlu" };
+  if (!query) {
+    return {
+      ok: false,
+      researchStatus: "research_failed",
+      results: [],
+      hata: "query zorunlu",
+    };
+  }
   try {
     const response = await fetch("/api/research", {
       method: "POST",
@@ -192,10 +199,34 @@ async function webArastir(girdi) {
       body: JSON.stringify({ query }),
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) return { hata: data?.error || "web araştırması başarısız" };
-    return data;
+    if (!response.ok) {
+      return {
+        ok: false,
+        researchStatus: "research_failed",
+        results: [],
+        query,
+        hata: data?.error || "web araştırması başarısız",
+      };
+    }
+    if (!Array.isArray(data?.results) || data.results.length === 0) {
+      return {
+        ok: false,
+        researchStatus: "no_results",
+        results: [],
+        query,
+        source: data?.source || "DuckDuckGo HTML",
+        hata: "Araştırma kaynağı sonuç döndürmedi.",
+      };
+    }
+    return { ...data, ok: true, researchStatus: "success" };
   } catch (e) {
-    return { hata: e?.message || "web araştırması çalıştırılamadı" };
+    return {
+      ok: false,
+      researchStatus: "research_failed",
+      results: [],
+      query,
+      hata: e?.message || "web araştırması çalıştırılamadı",
+    };
   }
 }
 
