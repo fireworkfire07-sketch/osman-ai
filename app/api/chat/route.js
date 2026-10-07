@@ -220,7 +220,7 @@ export async function POST(request) {
       : `\n\n---\nREPOSITORY KANITI (gerçek GitHub API sonucu, ${ALLOWED_REPO_LABEL}, commit ${repoEvidence.commitShortSha || "bilinmiyor"}):\n${repoEvidence.evidenceText || "(ilgili dosya bulunamadı)"}\n\nKESİN KURALLAR:\n- Yalnızca yukarıdaki [SOURCE n] bloklarında verilen dosya yolunu ve satırları kullan.\n- Yukarıda verilmeyen hiçbir dosya adını, satır numarasını veya fonksiyonu söyleme.\n- Dosyanın yaşını veya geçmişini commit verisi olmadan tahmin etme.\n- "Kodda gördüm", "dosyaları inceledim" veya "kanıtladım" ifadelerini yalnızca yukarıdaki gerçek kanıt varsa kullan.\n- Her teknik iddiadan sonra "Kanıt: <dosya yolu>:<satırlar>" ekle.\n- Yetersiz kanıt varsa "Doğrulanamadı" de.`;
   }
 
-  const baseSystemPrompt = araclar ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  const baseSystemPrompt = araclar || researchEvidence ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT;
   const researchBlock = researchEvidence
     ? `\n\n---\nGÜNCEL ARAŞTIRMA KANITI:\nBu istekte güncel araştırma doğrudan /api/research üzerinden başarıyla yapıldı. Aşağıdaki sonuçlar gerçek araştırma çıktısıdır. Yalnızca bu kanıtın desteklediği iddiaları kullan; sonucu güncel web erişimi yapmış gibi genişletme. KANIT / ÇIKARIM / HİPOTEZ ayrımını koru.\n${JSON.stringify(researchEvidence).slice(0, 14000)}`
     : "";
