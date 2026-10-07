@@ -5,7 +5,24 @@ import { projectsCollection } from "../data/projects";
 
 // A2 yapım emri Bölüm 2b — tarayıcıdan Groq'a gönderilen araç tanımları.
 // route.js bu diziyi olduğu gibi Groq'a iletir, kendisi hiçbir aracı çalıştırmaz.
-export const ARACLAR = [
+export const ARACLAR = [\n  {
+    type: "function",
+    function: {
+      name: "web_arastir",
+      description:
+        "Güncel web araştırması yapar. Pazar, YouTube nişi, talep, rekabet, başarılı video örnekleri ve güncel kaynakları araştırmak için kullanılır. " +
+        "Kullanıcı güncel kanıt gerektiren bir seçim istiyorsa, niş/fikir seçmeden ÖNCE bu aracı kullan. " +
+        "Araştırma sonucunu kanıt, çıkarım ve hipotez olarak ayır; tek bir arama sonucu pazar başarısını kanıtlamaz.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string", description: "Tek bir net web arama sorgusu, en fazla 300 karakter" },
+        },
+        required: ["query"],
+      },
+    },
+  },
+
   {
     type: "function",
     function: {
@@ -208,6 +225,23 @@ function hafizaAra(girdi) {
   }
 
   return { ok: true, sonuclar: sonuclar.slice(0, MAX_HAFIZA_ARA_SONUC) };
+}
+
+async function webArastir(girdi) {
+  const query = String(girdi?.query || "").trim();
+  if (!query) return { hata: "query zorunlu" };
+  try {
+    const response = await fetch("/api/research", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) return { hata: data?.error || "web araştırması başarısız" };
+    return data;
+  } catch (e) {
+    return { hata: e?.message || "web araştırması çalıştırılamadı" };
+  }
 }
 
 const ARAC_HARITASI = {
