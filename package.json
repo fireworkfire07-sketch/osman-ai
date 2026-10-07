@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node --import ./tests/register-loader.mjs --test tests/*.test.mjs",
+    "test": "node --test-concurrency=1 --import ./tests/register-loader.mjs --test tests/*.test.mjs",
     "maintenance": "node scripts/maintenance.mjs"
   },
   "dependencies": {
