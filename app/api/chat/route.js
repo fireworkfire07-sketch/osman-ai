@@ -151,6 +151,13 @@ export async function POST(request) {
   const araclar = Array.isArray(body?.araclar) && body.araclar.length > 0 ? body.araclar : null;
   const dynamicContext = buildDynamicContext(body?.context || {});
   const lastUserMessage = [...history].reverse().find((m) => m.role === "user")?.content || "";
+  const researchEvidence =
+    body?.researchEvidence &&
+    body.researchEvidence.researchStatus === "success" &&
+    Array.isArray(body.researchEvidence.results) &&
+    body.researchEvidence.results.length > 0
+      ? body.researchEvidence
+      : null;
 
   // Repository ile ilgili bir istek mi? Öyleyse gerçek GitHub API kanıtı
   // (repo allowlist: yalnızca fireworkfire07-sketch/osman-ai) toplanır ve
@@ -182,10 +189,15 @@ export async function POST(request) {
   }
 
   const baseSystemPrompt = araclar ? TOOL_SYSTEM_PROMPT : SYSTEM_PROMPT;
+  const researchBlock = researchEvidence
+    ? `\n\n---\nGÜNCEL ARAŞTIRMA KANITI:\nBu istekte güncel araştırma doğrudan /api/research üzerinden başarıyla yapıldı. Aşağıdaki sonuçlar gerçek araştırma çıktısıdır. Yalnızca bu kanıtın desteklediği iddiaları kullan; sonucu güncel web erişimi yapmış gibi genişletme. KANIT / ÇIKARIM / HİPOTEZ ayrımını koru.\n${JSON.stringify(researchEvidence).slice(0, 14000)}`
+    : "";
+
   const systemContent =
     baseSystemPrompt +
     buildOsmanProfileBlock() +
     (dynamicContext ? `\n\n---\nOsman hakkında bilinenler (yalnızca ilgiliyse kullan):\n${dynamicContext}` : "") +
+    researchBlock +
     repositoryBlock;
 
   const chatMessages = [{ role: "system", content: systemContent }, ...history.map(toGroqMessage).filter(Boolean)];
