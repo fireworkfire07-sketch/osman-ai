@@ -253,11 +253,11 @@ const ARAC_HARITASI = {
 };
 
 // Tarayicida calisir (bkz. yapım emri Bölüm 2a) — sunucu tool çalıştırmaz.
-export function araciCalistir(ad, girdi) {
+export async function araciCalistir(ad, girdi) {
   const fn = ARAC_HARITASI[ad];
   if (!fn) return { hata: `Bilinmeyen arac: ${ad}` };
   try {
-    return fn(girdi || {});
+    return await fn(girdi || {});
   } catch (e) {
     return { hata: e?.message || "arac calistirilamadi" };
   }
