@@ -8,12 +8,24 @@ import { WELCOME_MESSAGE, QUICK_START_PROMPTS } from "../lib/core";
 import { ARACLAR, araciCalistir } from "../lib/tools/agentTools";
 
 const MAX_ARAC_TURU = 4;
+const MAX_MODEL_MESAJ = 8;
 
-async function groqTuru(mesajlar, contextData) {
+function araclariSec(text) {
+  const s = String(text || "").toLocaleLowerCase("tr-TR");
+  const adlar = new Set();
+  if (/araştır|güncel|youtube|niş|talep|rekabet|başarılı video|fırsat|para kazan|pazar|rakip/.test(s)) adlar.add("web_arastir");
+  if (/hafıza|hatırla|hatırlat|unutma|kaydet/.test(s)) adlar.add(s.includes("ara") || s.includes("bul") ? "hafiza_ara" : "hafiza_ekle");
+  if (/karar/.test(s)) adlar.add("karar_ekle");
+  if (/görev|yapılacak|todo/.test(s)) adlar.add("gorev_ekle");
+  if (/proje/.test(s) && /güncelle|durum|çalışıyor|çalışmıyor|hata|sonraki/.test(s)) adlar.add("proje_guncelle");
+  return ARACLAR.filter((arac) => adlar.has(arac.function.name));
+}
+
+async function groqTuru(mesajlar, contextData, araclar) {
   const cevap = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: mesajlar, context: contextData, araclar: ARACLAR }),
+    body: JSON.stringify({ messages: mesajlar, context: contextData, araclar }),
   });
 
   if (!cevap.ok) {
@@ -28,11 +40,13 @@ async function groqTuru(mesajlar, contextData) {
 // kendi collection fonksiyonlarıyla (agentTools.js) çalıştırır ve role:"tool"
 // mesajı olarak ekleyip tekrar gönderir. En fazla MAX_ARAC_TURU tur.
 async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
-  let mesajlar = baslangicMesajlari.map((m) => ({ role: m.role, content: m.content }));
+  const sonMesajlar = baslangicMesajlari.slice(-MAX_MODEL_MESAJ);
+  const araclar = araclariSec(sonMesajlar[sonMesajlar.length - 1]?.content);
+  let mesajlar = sonMesajlar.map((m) => ({ role: m.role, content: m.content }));
   const yapilanKayitlar = [];
 
   for (let tur = 0; tur < MAX_ARAC_TURU; tur++) {
-    const veri = await groqTuru(mesajlar, contextData);
+    const veri = await groqTuru(mesajlar, contextData, araclar);
     const mesaj = veri?.choices?.[0]?.message;
     if (!mesaj) throw new Error("AI'dan geçerli bir cevap alınamadı.");
 
@@ -54,7 +68,7 @@ async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
       } catch (e) {
         sonuc = { hata: e?.message || "araç çalıştırılamadı" };
       }
-      mesajlar.push({ role: "tool", tool_call_id: cagri.id, content: JSON.stringify(sonuc) });
+      mesajlar.push({ role: "tool", tool_call_id: cagri.id, name: cagri.function.name, content: JSON.stringify(sonuc) });
     }
   }
 
