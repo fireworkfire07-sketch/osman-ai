@@ -81,6 +81,10 @@ export async function POST(request) {
   const compactSystemPrompt = String(SYSTEM_PROMPT).slice(0, 4500);
   const compactContext = String(context || "").slice(0, 800);
   const compactResearch = String(researchBlock || "").slice(0, 2200);
+  const researchInstruction = researchBlock
+    ? "\n\nARAŞTIRMA KULLANIM KURALI: Yukarıdaki GÜNCEL ARAŞTIRMA KANITI sunucu tarafında gerçekten toplanmış web sonuçlarıdır. Bunları doğrudan kanıt olarak değerlendir; kullanıcıya \"web erişimim yok\", \"araştırma yapamıyorum\" veya \"haberleri çekemiyorum\" deme. Sonuçlar zayıfsa bunu açıkça söyle ve kanıt yetersiz de. Kaynak URL'lerini mümkün olduğunca koru."
+    : "";
+
 
   const messages = [
     {
@@ -89,7 +93,7 @@ export async function POST(request) {
         compactSystemPrompt +
         buildOsmanProfileBlock().slice(0, 600) +
         (compactContext ? `\n\n---\nOsman hakkında bilinenler:\n${compactContext}` : "") +
-        compactResearch,
+        compactResearch +\n        researchInstruction,
     },
     ...history.slice(-2).map(toGroqMessage).filter(Boolean),
   ];
