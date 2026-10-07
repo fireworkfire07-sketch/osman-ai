@@ -193,7 +193,16 @@ async function webArastir(girdi) {
     };
   }
   try {
-    const endpoint = "/api/research";
+    const endpoint = typeof window !== "undefined" ? "/api/research" : null;
+    if (!endpoint) {
+      return {
+        ok: false,
+        researchStatus: "research_failed",
+        results: [],
+        query,
+        hata: "Araştırma aracı yanlış çalışma ortamında çağrıldı.",
+      };
+    }
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
