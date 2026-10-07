@@ -93,7 +93,8 @@ export async function POST(request) {
         compactSystemPrompt +
         buildOsmanProfileBlock().slice(0, 600) +
         (compactContext ? `\n\n---\nOsman hakkında bilinenler:\n${compactContext}` : "") +
-        compactResearch +\n        researchInstruction,
+        compactResearch +
+        researchInstruction,
     },
     ...history.slice(-2).map(toGroqMessage).filter(Boolean),
   ];
