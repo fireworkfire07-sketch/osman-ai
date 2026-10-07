@@ -1,4 +1,5 @@
 import { SYSTEM_PROMPT } from "../../lib/core";
+import { performWebResearch } from "../../lib/research";
 import { buildDynamicContext } from "../../lib/context";
 import { checkRateLimit, getClientIp } from "./rateLimit";
 import { isRepositoryRequest, buildRepositoryEvidence } from "../../lib/tools/toolRouter";
@@ -146,8 +147,21 @@ export async function POST(request) {
     buildOsmanProfileBlock() +
     (dynamicContext ? `\n\n---\nOsman hakkında bilinenler:\n${dynamicContext}` : "");
 
+  const lastUserMessage = [...history].reverse().find((m) => m?.role === "user")?.content || "";
+  const needsResearch = /araştır|güncel|youtube|niş|talep|rekabet|başarılı video|fırsat|para kazan|pazar|rakip/i.test(lastUserMessage);
+  let researchBlock = "";
+
+  if (needsResearch) {
+    const research = await performWebResearch(String(lastUserMessage).slice(0, 300));
+    if (research?.ok && research?.results?.length) {
+      researchBlock = `\n\n--- GÜNCEL ARAŞTIRMA KANITI ---\nKaynak: ${research.source}\nSorgu: ${research.query}\n${research.results.map((x, i) => `${i + 1}. ${x.title} — ${x.snippet} — ${x.url}`).join("\n")}\n--- KANIT SONU ---`;
+    } else {
+      researchBlock = "\n\n--- ARAŞTIRMA DURUMU ---\nGüncel araştırma başarısız/sonuçsuz. Kanıtsız pazar veya niş iddiası üretme.\n--- DURUM SONU ---";
+    }
+  }
+
   const messages = [
-    { role: "system", content: systemContent },
+    { role: "system", content: systemContent + researchBlock },
     ...history.slice(-8).map(toGroqMessage).filter(Boolean),
   ];
 
