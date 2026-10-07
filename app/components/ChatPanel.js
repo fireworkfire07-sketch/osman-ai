@@ -45,20 +45,9 @@ async function sohbetCalistir(baslangicMesajlari, contextData, onDataChanged) {
   let mesajlar = sonMesajlar.map((m) => ({ role: m.role, content: m.content }));
   const yapilanKayitlar = [];
 
-  // Güncel araştırma artık tamamen sunucuda yapılır.
-  // Tarayıcıdan /api/research çağrısı yok; böylece Safari/WebKit URL
-  // kaynaklı "The string did not match the expected pattern" hatası
-  // araştırma akışından çıkarılır.
-  const webAraci = araclar.find((arac) => arac.function.name === "web_arastir");
-  if (webAraci) {
-    const veri = await groqTuru(mesajlar, contextData, [], null, true);
-    const mesaj = veri?.choices?.[0]?.message;
-    if (!mesaj) throw new Error("AI'dan geçerli bir araştırma cevabı alınamadı.");
-    return { metin: mesaj.content || "", kayitlar: yapilanKayitlar };
-  }
-
+  // Güncel araştırma da dahil tüm istekler yalnızca /api/chat üzerinden gider.
   for (let tur = 0; tur < MAX_ARAC_TURU; tur++) {
-    const veri = await groqTuru(mesajlar, contextData, araclar, null, false);
+    const veri = await groqTuru(mesajlar, contextData, araclar, null, araclar.some((a) => a.function.name === "web_arastir"));
     const mesaj = veri?.choices?.[0]?.message;
     if (!mesaj) throw new Error("AI'dan geçerli bir cevap alınamadı.");
 
