@@ -12,17 +12,17 @@ test("ARACLAR: araclar tanimli, hepsi function tipinde", () => {
 });
 
 test("araciCalistir: bilinmeyen arac adi hata dondurur", async () => {
-  const sonuc = await await araciCalistir("olmayan_arac", {});
+  const sonuc = await araciCalistir("olmayan_arac", {});
   assert.ok(sonuc.hata);
 });
 
 test("hafiza_ekle: baslik veya durum eksikse hata dondurur", async () => {
-  assert.ok(await araciCalistir("hafiza_ekle", { baslik: "x" }).hata);
-  assert.ok(await araciCalistir("hafiza_ekle", { durum: "x" }).hata);
+  assert.ok((await araciCalistir("hafiza_ekle", { baslik: "x" })).hata);
+  assert.ok((await araciCalistir("hafiza_ekle", { durum: "x" })).hata);
 });
 
 test("hafiza_ekle: gecerli girdi ile basarili kayit dondurur", async () => {
-  const sonuc = araciCalistir("hafiza_ekle", {
+  const sonuc = await araciCalistir("hafiza_ekle", {
     baslik: "On odeme kurali",
     durum: "Otel cekimlerinde on odeme almadan yer ayirmiyor",
     kural: "On odeme yoksa takvime yer ayirma",
@@ -33,7 +33,7 @@ test("hafiza_ekle: gecerli girdi ile basarili kayit dondurur", async () => {
 });
 
 test("karar_ekle: baslik veya karar eksikse hata dondurur", async () => {
-  assert.ok(await araciCalistir("karar_ekle", { baslik: "x" }).hata);
+  assert.ok((await araciCalistir("karar_ekle", { baslik: "x" })).hata);
 });
 
 test("karar_ekle: gecerli girdi ile basarili kayit dondurur", async () => {
@@ -44,11 +44,11 @@ test("karar_ekle: gecerli girdi ile basarili kayit dondurur", async () => {
 });
 
 test("gorev_ekle: baslik, tek_islem veya test eksikse hata dondurur", async () => {
-  assert.ok(await araciCalistir("gorev_ekle", { baslik: "x", tek_islem: "y" }).hata);
+  assert.ok((await araciCalistir("gorev_ekle", { baslik: "x", tek_islem: "y" })).hata);
 });
 
 test("gorev_ekle: gecerli girdi ile basarili kayit dondurur", async () => {
-  const sonuc = araciCalistir("gorev_ekle", {
+  const sonuc = await araciCalistir("gorev_ekle", {
     baslik: "Test gorevi",
     tek_islem: "Bir seyi yap",
     test: "Calistigini kontrol et",
@@ -76,7 +76,7 @@ test("proje_guncelle: seed projesini adiyla bulup gunceller", async () => {
 });
 
 test("hafiza_ara: bos sorgu hata dondurur", async () => {
-  assert.ok(await araciCalistir("hafiza_ara", {}).hata);
+  assert.ok((await araciCalistir("hafiza_ara", {})).hata);
 });
 
 test("hafiza_ara: eslesme olmadan bos sonuc listesi dondurur", async () => {
