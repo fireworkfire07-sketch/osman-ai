@@ -1,4 +1,5 @@
 import { SYSTEM_PROMPT } from "../../lib/core";
+import { GOOD_TO_GREAT } from "../../lib/core/goodToGreat";
 import { buildDynamicContext } from "../../lib/context";
 import { performWebResearch } from "../../lib/research";
 import { checkRateLimit } from "./rateLimit";
@@ -91,6 +92,7 @@ export async function POST(request) {
       role: "system",
       content:
         compactSystemPrompt +
+        GOOD_TO_GREAT +
         buildOsmanProfileBlock().slice(0, 600) +
         (compactContext ? `\n\n---\nOsman hakkında bilinenler:\n${compactContext}` : "") +
         compactResearch +
